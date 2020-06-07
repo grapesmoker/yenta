@@ -38,8 +38,8 @@ def test_pipeline_run():
     @task(depends_on=['foo', 'bar'])
     def baz(previous_results: PipelineResult):
 
-        x = previous_results.values['foo', 'x']
-        y = previous_results.values['bar', 'y']
+        x = previous_results.values('foo', 'x')
+        y = previous_results.values('bar', 'y')
 
         result = x + y
 
@@ -48,5 +48,5 @@ def test_pipeline_run():
     pipeline = Pipeline([foo, bar, baz])
     result = pipeline.run_pipeline()
 
-    sum = result.values['baz', 'sum']
+    sum = result.values('baz', 'sum')
     assert(sum == 3)

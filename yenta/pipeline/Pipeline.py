@@ -21,7 +21,9 @@ class TaskResult:
     artifacts: Dict[str, Artifact] = field(default_factory=dict)
 
 
-class PipelineValues:
+class PipelineDescriptor:
+
+    PIPELINE_ACCESSOR = None
 
     def __get__(self, instance, owner):
 
@@ -30,19 +32,31 @@ class PipelineValues:
 
     def __getitem__(self, item):
         if not isinstance(item, tuple) and len(item) != 2:
-            raise TypeError(f'Attempt to access values with invalid keys: {item}, '
-                            f'expected tuple (task_name, value_name)')
-        return self._task_results[item[0]].values[item[1]].value
+            raise TypeError(f'Attempt to access {self.PIPELINE_ACCESSOR} with invalid keys: {item}, '
+                            f'expected tuple of the form (task_name, {self.PIPELINE_ACCESSOR}_name)')
+        return getattr(self._task_results[item[0]], self.PIPELINE_ACCESSOR)[item[1]].value
+
+
+class PipelineValues(PipelineDescriptor):
+
+    PIPELINE_ACCESSOR = 'values'
+
+
+class PipelineArtifacts(PipelineDescriptor):
+    PIPELINE_ACCESSOR = 'artifacts'
 
 
 @dataclass
 class PipelineResult:
     """ Holds the intermediate results of a step in the pipeline, where the keys of the dicts
         are the names of the tasks that have been executed and the values are TaskResults"""
-    # values: Dict[str, TaskResult] = field(default_factory=dict)
-    # artifacts: Dict[str, TaskResult] = field(default_factory=dict)
     task_results: Dict[str, TaskResult] = field(default_factory=dict)
-    values = PipelineValues()
+
+    def values(self, task_name, value_name=False):
+        return self.task_results[task_name].values[value_name].value
+
+    def artifacts(self, task_name, artifact_name=False):
+        return self.task_results[task_name].values[artifact_name].value
 
 
 class Pipeline:
@@ -64,6 +78,19 @@ class Pipeline:
 
         self.execution_order = list(nx.algorithms.dag.lexicographical_topological_sort(self.task_graph))
 
+    @staticmethod
+    def _wrap_task_output(raw_output, task_name):
+
+        if isinstance(raw_output, dict):
+            output: TaskResult = TaskResult(**raw_output)
+        elif isinstance(raw_output, TaskResult):
+            output = raw_output
+        else:
+            raise ImproperTaskResultError(f'Task {task_name} returned invalid result of type {type(raw_output)}, '
+                                          f'expected either a dict or a TaskResult')
+
+        return output
+
     def run_pipeline(self):
 
         result = PipelineResult()
@@ -74,14 +101,8 @@ class Pipeline:
             for dependency in (task.task_def.depends_on or []):
                 args.task_results[dependency] = result.task_results[dependency]
 
-            raw_output = task(previous_results=args)
-            if isinstance(raw_output, dict):
-                output: TaskResult = TaskResult(**raw_output)
-            elif isinstance(raw_output, TaskResult):
-                output = raw_output
-            else:
-                raise ImproperTaskResultError(f'Task {node} returned invalid result of type {type(raw_output)}, '
-                                              f'expected either a dict or a TaskResult')
+            output = self._wrap_task_output(task(previous_results=args), node)
+
             result.task_results[task.task_def.name] = output
 
         return result
