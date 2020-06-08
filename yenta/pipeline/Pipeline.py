@@ -21,31 +21,6 @@ class TaskResult:
     artifacts: Dict[str, Artifact] = field(default_factory=dict)
 
 
-class PipelineDescriptor:
-
-    PIPELINE_ACCESSOR = None
-
-    def __get__(self, instance, owner):
-
-        self._task_results: Dict[str, TaskResult] = instance.task_results
-        return self
-
-    def __getitem__(self, item):
-        if not isinstance(item, tuple) and len(item) != 2:
-            raise TypeError(f'Attempt to access {self.PIPELINE_ACCESSOR} with invalid keys: {item}, '
-                            f'expected tuple of the form (task_name, {self.PIPELINE_ACCESSOR}_name)')
-        return getattr(self._task_results[item[0]], self.PIPELINE_ACCESSOR)[item[1]].value
-
-
-class PipelineValues(PipelineDescriptor):
-
-    PIPELINE_ACCESSOR = 'values'
-
-
-class PipelineArtifacts(PipelineDescriptor):
-    PIPELINE_ACCESSOR = 'artifacts'
-
-
 @dataclass
 class PipelineResult:
     """ Holds the intermediate results of a step in the pipeline, where the keys of the dicts
@@ -61,7 +36,7 @@ class PipelineResult:
 
 class Pipeline:
 
-    def __init__(self, tasks):
+    def __init__(self, *tasks):
 
         self._tasks = tasks
         self.task_graph = nx.DiGraph()

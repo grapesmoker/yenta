@@ -45,7 +45,7 @@ def test_pipeline_run():
 
         return TaskResult({'sum': Value('sum', result)}, {})
 
-    pipeline = Pipeline([foo, bar, baz])
+    pipeline = Pipeline(foo, bar, baz)
     result = pipeline.run_pipeline()
 
     sum = result.values('baz', 'sum')
