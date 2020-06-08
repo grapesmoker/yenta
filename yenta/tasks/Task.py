@@ -59,7 +59,9 @@ def build_parameter_spec(func):
 
     err_format = '<task_name>__<values|artifacts>__<value_name|artifact_name>'
 
-    if len(param_names) == 1 and '__' not in param_names[0]:
+    if len(param_names) == 0:
+        spec = []
+    elif len(param_names) == 1 and '__' not in param_names[0]:
         spec = [ParameterSpec(param_names[0], ParameterType.PAST_RESULTS)]
     elif len(param_names) > 1:
         spec = []
@@ -93,11 +95,12 @@ def task(_func=None, *, depends_on: str = None, pure: bool = True):
         def task_wrapper(*args, **kwargs):
             return func(*args, **kwargs)
 
-        task_wrapper.task_def = TaskDef(**{
-            'name': func.__name__,
-            'depends_on': depends_on,
-            'pure': pure,
-        })
+        task_wrapper.task_def = TaskDef(
+            name=func.__name__,
+            depends_on=depends_on,
+            pure=pure,
+            param_specs=build_parameter_spec(func)
+        )
 
         return task_wrapper
 

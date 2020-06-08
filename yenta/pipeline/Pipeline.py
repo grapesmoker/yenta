@@ -5,12 +5,16 @@ from dataclasses import dataclass, field
 from pprint import pprint
 from typing import List, Dict, Any
 
-from yenta.tasks.Task import TaskDef
+from yenta.tasks.Task import TaskDef, ParameterType, ResultSpec, ResultType
 from yenta.artifacts.Artifact import Artifact
 from yenta.values.Value import Value
 
 
-class ImproperTaskResultError(Exception):
+class InvalidTaskResultError(Exception):
+    pass
+
+
+class InvalidParameterError(Exception):
     pass
 
 
@@ -27,11 +31,15 @@ class PipelineResult:
         are the names of the tasks that have been executed and the values are TaskResults"""
     task_results: Dict[str, TaskResult] = field(default_factory=dict)
 
-    def values(self, task_name, value_name=False):
+    def values(self, task_name: str, value_name: str):
         return self.task_results[task_name].values[value_name].value
 
-    def artifacts(self, task_name, artifact_name=False):
+    def artifacts(self, task_name: str, artifact_name: str):
         return self.task_results[task_name].values[artifact_name].value
+
+    def from_spec(self, spec: ResultSpec):
+        func = getattr(self, spec.resut_type)
+        return func(spec.result_task_name, spec.result_var_name)
 
 
 class Pipeline:
@@ -61,10 +69,27 @@ class Pipeline:
         elif isinstance(raw_output, TaskResult):
             output = raw_output
         else:
-            raise ImproperTaskResultError(f'Task {task_name} returned invalid result of type {type(raw_output)}, '
+            raise InvalidTaskResultError(f'Task {task_name} returned invalid result of type {type(raw_output)}, '
                                           f'expected either a dict or a TaskResult')
 
         return output
+
+    def invoke_task(self, task, args: PipelineResult):
+
+        task_def: TaskDef = task.task_def
+        if len(task_def.param_specs) == 0:
+            output = task()
+        elif len(task_def.param_specs) == 1 and task_def.param_specs[0].param_type == ParameterType.PAST_RESULTS:
+            output = task(args)
+        else:
+            args_dict = {}
+            for spec in task_def.param_specs:
+                if spec.param_type != ParameterType.EXPLICIT:
+                    raise InvalidParameterError(f'Only EXPLICIT parameters are allowed for {task_def.name}')
+                args_dict[spec.param_name] = args.from_spec(spec.result_spec)
+            output = task(**args_dict)
+
+        return self._wrap_task_output(output, task_def.name)
 
     def run_pipeline(self):
 
@@ -76,7 +101,8 @@ class Pipeline:
             for dependency in (task.task_def.depends_on or []):
                 args.task_results[dependency] = result.task_results[dependency]
 
-            output = self._wrap_task_output(task(previous_results=args), node)
+            # output = self._wrap_task_output(task(previous_results=args), node)
+            output = self.invoke_task(task, args)
 
             result.task_results[task.task_def.name] = output
 

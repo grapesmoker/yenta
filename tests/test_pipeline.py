@@ -10,22 +10,24 @@ from yenta.artifacts.Artifact import Artifact
 def test_pipeline_creation():
 
     @task
-    def foo(values=None, artifacts=None):
+    def foo(previous_results=None):
         pass
 
     @task
-    def bar(values=None, artifacts=None):
+    def bar():
         pass
 
     @task(depends_on=['foo', 'bar'])
-    def baz(values=None, artifacts=None):
+    def baz(previous_results):
         pass
 
-    pipeline = Pipeline()
-    pipeline.build_task_graph()
+    pipeline = Pipeline(foo, bar, baz)
+    assert(pipeline.task_graph.has_edge('foo', 'baz'))
+    assert(pipeline.task_graph.has_edge('bar', 'baz'))
+    assert(not pipeline.task_graph.has_edge('foo', 'bar'))
 
 
-def test_pipeline_run():
+def test_run_pipeline_with_past_results():
 
     @task
     def foo(previous_results=None) -> TaskResult:
@@ -50,3 +52,27 @@ def test_pipeline_run():
 
     sum = result.values('baz', 'sum')
     assert(sum == 3)
+
+
+def test_pipeline_run_with_explicit_params():
+
+    @task
+    def foo() -> TaskResult:
+        return TaskResult({'x': Value('x', 1)}, {})
+
+    @task
+    def bar():
+        return TaskResult({'y': Value('y', 2)}, {})
+
+    @task(depends_on=['foo', 'bar'])
+    def baz(x: 'foo__values__x', y: 'bar__values__y'):
+
+        result = x + y
+
+        return TaskResult({'sum': Value('sum', result)}, {})
+
+    pipeline = Pipeline(foo, bar, baz)
+    result = pipeline.run_pipeline()
+
+    sum = result.values('baz', 'sum')
+    assert (sum == 3)

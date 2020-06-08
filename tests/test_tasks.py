@@ -63,12 +63,3 @@ def test_task_definition():
 
     assert(foo.task_def == expected_def)
 
-
-def test_improper_task_def():
-
-    with pytest.raises(InvalidTaskDefinitionError) as ex:
-        @task
-        def foo():
-            pass
-
-    assert('values' in str(ex.value) and 'artifacts' in str(ex.value))
