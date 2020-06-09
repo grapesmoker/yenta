@@ -7,7 +7,7 @@ from typing import Callable, List, Optional, Any
 
 class ParameterType(int, Enum):
 
-    PAST_RESULTS = 1
+    PIPELINE_RESULTS = 1
     EXPLICIT = 2
 
 
@@ -62,7 +62,7 @@ def build_parameter_spec(func):
     if len(param_names) == 0:
         spec = []
     elif len(param_names) == 1 and '__' not in param_names[0]:
-        spec = [ParameterSpec(param_names[0], ParameterType.PAST_RESULTS)]
+        spec = [ParameterSpec(param_names[0], ParameterType.PIPELINE_RESULTS)]
     elif len(param_names) > 1:
         spec = []
         for name in param_names:

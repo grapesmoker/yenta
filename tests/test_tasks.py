@@ -13,7 +13,7 @@ def test_build_param_spec():
         pass
 
     spec = build_parameter_spec(foo)
-    expected_spec = [ParameterSpec('previous_results', ParameterType.PAST_RESULTS)]
+    expected_spec = [ParameterSpec('previous_results', ParameterType.PIPELINE_RESULTS)]
 
     assert(spec == expected_spec)
 
@@ -59,7 +59,7 @@ def test_task_definition():
     def foo(previous_results):
         pass
 
-    expected_def = TaskDef('foo', None, True, [ParameterSpec('previous_results', ParameterType.PAST_RESULTS)])
+    expected_def = TaskDef('foo', None, True, [ParameterSpec('previous_results', ParameterType.PIPELINE_RESULTS)])
 
     assert(foo.task_def == expected_def)
 

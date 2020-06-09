@@ -25,7 +25,7 @@ class FileArtifact(Artifact):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.location: Path = Path(self.location)
+        self._path: Path = Path(self.location)
 
     def artifact_hash(self):
-        return file_hash(self.location).hexdigest()
+        return file_hash(self._path).hexdigest()
