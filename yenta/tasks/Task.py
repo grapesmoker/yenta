@@ -1,8 +1,8 @@
 from dataclasses import dataclass, field
 from enum import Enum
 from functools import wraps
-from inspect import signature, Parameter
-from typing import Callable, List, Optional, Any
+from inspect import signature
+from typing import Callable, List, Optional
 
 
 class ParameterType(int, Enum):
@@ -71,7 +71,7 @@ def build_parameter_spec(func):
                 raise InvalidTaskDefinitionError(
                     f'Annotation string missing for variable {name}.'
                     f'Function parameters must be annotated using the following format:'
-                                                 f'\n{err_format}')
+                    f'\n{err_format}')
             annot = param.annotation.split('__')
             if len(annot) != 3:
                 raise InvalidTaskDefinitionError(
@@ -84,23 +84,20 @@ def build_parameter_spec(func):
     return spec
 
 
-def task(_func=None, *, depends_on: str = None, pure: bool = True):
+def task(_func=None, *, depends_on: Optional[List[str]] = None, pure: bool = True):
 
     def decorator_task(func: Callable):
-
-        sig = signature(func)
-        param_names = sig.parameters.keys()
 
         @wraps(func)
         def task_wrapper(*args, **kwargs):
             return func(*args, **kwargs)
 
-        task_wrapper.task_def = TaskDef(
+        setattr(task_wrapper, 'task_def', TaskDef(
             name=func.__name__,
             depends_on=depends_on,
             pure=pure,
             param_specs=build_parameter_spec(func)
-        )
+        ))
 
         return task_wrapper
 

@@ -1,6 +1,4 @@
-from abc import abstractmethod
 from dataclasses import dataclass
-from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
@@ -15,7 +13,6 @@ class Artifact:
     date_created: str
     hash: Optional[str] = None
 
-    @abstractmethod
     def artifact_hash(self):
         raise NotImplementedError
 

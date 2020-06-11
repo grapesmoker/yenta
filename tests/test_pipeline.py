@@ -126,14 +126,14 @@ def test_pipeline_run_with_artifacts():
     @task(depends_on=['foo', 'bar'])
     def baz(x: 'foo__values__x', y: 'bar__values__y',
             foo_artifact: 'foo__artifacts__foo_file', bar_artifact: 'bar__artifacts__bar_file'):
-        result = x + y
+        sum_x_y = x + y
         with open(foo_artifact.location, 'r') as f:
             foo_data = f.read()
         with open(bar_artifact.location, 'r') as f:
             bar_data = f.read()
         with open(baz_file, 'w') as f:
             f.write(foo_data + bar_data)
-        return TaskResult({'sum': Value('sum', result)},
+        return TaskResult({'sum': Value('sum', sum_x_y)},
                           {'baz_file': FileArtifact('baz_file', baz_file, str(datetime.now()))})
 
     pipeline = Pipeline(foo, bar, baz)

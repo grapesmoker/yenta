@@ -3,10 +3,10 @@ import networkx as nx
 
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Dict
 
 from yenta.config.settings import YENTA_JSON_STORE_PATH
-from yenta.tasks.Task import TaskDef, ParameterType, ResultSpec, ResultType
+from yenta.tasks.Task import TaskDef, ParameterType, ResultSpec
 from yenta.artifacts.Artifact import Artifact
 from yenta.values.Value import Value
 
@@ -91,7 +91,7 @@ class Pipeline:
             output = raw_output
         else:
             raise InvalidTaskResultError(f'Task {task_name} returned invalid result of type {type(raw_output)}, '
-                                          f'expected either a dict or a TaskResult')
+                                         f'expected either a dict or a TaskResult')
 
         return output
 
@@ -104,7 +104,7 @@ class Pipeline:
         for spec in task_def.param_specs:
             if spec.param_type == ParameterType.PIPELINE_RESULTS:
                 args_dict[spec.param_name] = args
-            elif spec.param_type == ParameterType.EXPLICIT:
+            elif spec.param_type == ParameterType.EXPLICIT and spec.result_spec:
                 args_dict[spec.param_name] = args.from_spec(spec.result_spec)
 
         return args_dict
@@ -120,7 +120,8 @@ class Pipeline:
         with open(cache_file, 'w') as f:
             json.dump(asdict(result), f, indent=4)
 
-    def load_pipeline(self):
+    @staticmethod
+    def load_pipeline():
 
         if YENTA_JSON_STORE_PATH.exists():
             with open(YENTA_JSON_STORE_PATH, 'r') as f:
