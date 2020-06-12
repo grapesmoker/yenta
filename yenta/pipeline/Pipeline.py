@@ -4,8 +4,9 @@ import networkx as nx
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Dict
+from enum import Enum
 
-from yenta.config.settings import YENTA_JSON_STORE_PATH
+from yenta.config import settings
 from yenta.tasks.Task import TaskDef, ParameterType, ResultSpec
 from yenta.artifacts.Artifact import Artifact
 from yenta.values.Value import Value
@@ -19,11 +20,18 @@ class InvalidParameterError(Exception):
     pass
 
 
+class TaskStatus(str, Enum):
+
+    SUCCESS = 'success'
+    FAILURE = 'failure'
+
+
 @dataclass
 class TaskResult:
     """ Holds the result of a specific task execution """
     values: Dict[str, Value] = field(default_factory=dict)
     artifacts: Dict[str, Artifact] = field(default_factory=dict)
+    status: TaskStatus = None
 
     def __post_init__(self):
 
@@ -123,8 +131,8 @@ class Pipeline:
     @staticmethod
     def load_pipeline():
 
-        if YENTA_JSON_STORE_PATH.exists():
-            with open(YENTA_JSON_STORE_PATH, 'r') as f:
+        if settings.YENTA_JSON_STORE_PATH.exists():
+            with open(settings.YENTA_JSON_STORE_PATH, 'r') as f:
                 pipeline = PipelineResult(**json.load(f))
         else:
             pipeline = PipelineResult()
@@ -134,7 +142,7 @@ class Pipeline:
     def reuse_inputs(task_name, previous_result: PipelineResult, args: PipelineResult):
 
         previous_inputs = previous_result.task_inputs.get(task_name, None)
-        if previous_inputs:
+        if previous_inputs and previous_result.task_results.get(task_name).status == TaskStatus.SUCCESS:
             return previous_inputs == args
 
         return False
@@ -147,20 +155,29 @@ class Pipeline:
         for task_name in self.execution_order:
             task = self.task_graph.nodes[task_name]['task']
             args = PipelineResult()
+            dependencies_succeeded = True
             for dependency in (task.task_def.depends_on or []):
                 args.task_results[dependency] = result.task_results[dependency]
+                if result.task_results[dependency].status == TaskStatus.FAILURE:
+                    dependencies_succeeded = False
 
-            if self.reuse_inputs(task_name, previous_result, args):
-                self._tasks_reused.add(task_name)
-                output = previous_result.task_results[task_name]
-            else:
-                self._tasks_executed.add(task_name)
-                args_dict = self.build_args_dict(task, args)
-                output = self.invoke_task(task, **args_dict)
+            if dependencies_succeeded:
 
-            result.task_results[task_name] = output
-            result.task_inputs[task_name] = args
+                if self.reuse_inputs(task_name, previous_result, args):
+                    self._tasks_reused.add(task_name)
+                    output = previous_result.task_results[task_name]
+                else:
+                    self._tasks_executed.add(task_name)
+                    args_dict = self.build_args_dict(task, args)
+                    try:
+                        output = self.invoke_task(task, **args_dict)
+                        output.status = TaskStatus.SUCCESS
+                    except Exception:
+                        output = TaskResult(status=TaskStatus.FAILURE)
 
-            self.cache_pipeline_result(YENTA_JSON_STORE_PATH, result)
+                result.task_results[task_name] = output
+                result.task_inputs[task_name] = args
+
+                self.cache_pipeline_result(settings.YENTA_JSON_STORE_PATH, result)
 
         return result

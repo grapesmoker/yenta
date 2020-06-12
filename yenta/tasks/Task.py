@@ -99,6 +99,8 @@ def task(_func=None, *, depends_on: Optional[List[str]] = None, pure: bool = Tru
             param_specs=build_parameter_spec(func)
         ))
 
+        setattr(task_wrapper, '_yenta_task', True)
+
         return task_wrapper
 
     if _func is None:
