@@ -110,7 +110,10 @@ class Pipeline:
                 self.task_graph.add_edge(dependency, task.task_def.name)
 
         logger.debug('Computing execution order')
-        self.execution_order = list(nx.algorithms.dag.lexicographical_topological_sort(self.task_graph))
+        try:
+            self.execution_order = list(nx.algorithms.dag.lexicographical_topological_sort(self.task_graph))
+        except nx.NetworkXUnfeasible as ex:
+            print(Fore.RED + 'Unable to build execution graph because pipeline contains cyclic dependencies.')
 
     @staticmethod
     def _wrap_task_output(raw_output, task_name):
