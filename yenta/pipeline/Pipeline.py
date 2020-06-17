@@ -4,7 +4,7 @@ import logging
 
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Dict, List
+from typing import Dict, List, Union
 from enum import Enum
 from more_itertools import split_after
 from colorama import Fore, Style
@@ -35,14 +35,27 @@ class TaskStatus(str, Enum):
 @dataclass
 class TaskResult:
     """ Holds the result of a specific task execution """
-    values: Dict[str, Value] = field(default_factory=dict)
+    values: Dict[str, Union[Value, List, str, int, float, bool]] = field(default_factory=dict)
     artifacts: Dict[str, Artifact] = field(default_factory=dict)
     status: TaskStatus = None
     error: str = None
 
+    @staticmethod
+    def _wrap_as_value(v):
+
+        if isinstance(v, Value):
+            return v
+        elif isinstance(v, dict):
+            return Value(**v)
+        elif isinstance(v, str) or isinstance(v, int) or isinstance(v, float) or isinstance(v, bool) or \
+                isinstance(v, list) or v is None:
+            return Value(v)
+        else:
+            raise ValueError(f'Can not wrap {v} in a Value')
+
     def __post_init__(self):
 
-        values = {k: Value(**v) for k, v in self.values.items() if not isinstance(v, Value)}
+        values = {k: self._wrap_as_value(v) for k, v in self.values.items() if not isinstance(v, Value)}
         artifacts = {k: Artifact(**v) for k, v in self.artifacts.items() if not isinstance(v, Artifact)}
 
         self.values.update(values)

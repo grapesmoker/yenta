@@ -1,5 +1,3 @@
-import networkx as nx
-import matplotlib.pyplot as plt
 import json
 
 from datetime import datetime
@@ -9,7 +7,7 @@ from yenta.config import settings
 from yenta.tasks.Task import task
 from yenta.pipeline.Pipeline import Pipeline, TaskResult, PipelineResult
 from yenta.values.Value import Value
-from yenta.artifacts.Artifact import Artifact, FileArtifact
+from yenta.artifacts.Artifact import FileArtifact
 
 settings.YENTA_JSON_STORE_PATH = Path('tests/tmp/pipeline.json')
 
@@ -90,8 +88,7 @@ def test_pipeline_run_with_explicit_params():
     pipeline = Pipeline(foo, bar, baz)
     result = pipeline.run_pipeline()
     sum = result.values('baz', 'sum')
-    # import ipdb
-    # ipdb.set_trace()
+
     assert (sum == 3)
     assert (pipeline._tasks_executed == {'foo', 'bar', 'baz'})
     assert (pipeline._tasks_reused == set())
@@ -169,3 +166,28 @@ def test_pipeline_run_with_artifacts():
 
     if settings.YENTA_JSON_STORE_PATH.exists():
         settings.YENTA_JSON_STORE_PATH.unlink()
+
+
+def test_pipeline_with_non_scalar_values():
+
+    if settings.YENTA_JSON_STORE_PATH.exists():
+        settings.YENTA_JSON_STORE_PATH.unlink()
+
+    @task
+    def foo() -> TaskResult:
+        return TaskResult({'x': Value([1, 2, 3])})
+
+    @task
+    def bar():
+        return TaskResult({'y': [4, 5, 6]})
+
+    @task(depends_on=['foo', 'bar'])
+    def baz(x: 'foo__values__x', y: 'bar__values__y'):
+        sum_x_y = x + y
+        return TaskResult({'result': Value(sum_x_y)})
+
+    pipeline = Pipeline(foo, bar, baz)
+
+    result = pipeline.run_pipeline()
+    answer = result.values('baz', 'result')
+    assert (answer == [1, 2, 3, 4, 5, 6])
