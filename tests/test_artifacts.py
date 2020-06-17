@@ -2,7 +2,6 @@ import string
 
 from datetime import datetime
 from pathlib import Path
-from random import choices
 
 from yenta.artifacts.Artifact import Artifact, FileArtifact
 

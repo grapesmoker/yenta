@@ -1,4 +1,5 @@
 [run]
 
-omit = 
-    ./venv/* 	
+omit =
+    ./venv/*
+    ./tests/*

@@ -1,11 +1,12 @@
 import json
+import pytest
 
 from datetime import datetime
 from pathlib import Path
 
 from yenta.config import settings
 from yenta.tasks.Task import task
-from yenta.pipeline.Pipeline import Pipeline, TaskResult, PipelineResult
+from yenta.pipeline.Pipeline import Pipeline, TaskResult, PipelineResult, InvalidTaskResultError
 from yenta.values.Value import Value
 from yenta.artifacts.Artifact import FileArtifact
 
@@ -191,3 +192,29 @@ def test_pipeline_with_non_scalar_values():
     result = pipeline.run_pipeline()
     answer = result.values('baz', 'result')
     assert (answer == [1, 2, 3, 4, 5, 6])
+
+
+def test_wrap_value():
+
+    v = Value(1)
+    assert v == TaskResult._wrap_as_value(v)
+    assert v == TaskResult._wrap_as_value({'value': 1})
+    assert v == TaskResult._wrap_as_value(1)
+
+    with pytest.raises(ValueError) as ex:
+        TaskResult._wrap_as_value({1})
+
+    assert f'Can not wrap {set([1])} in a Value'
+
+
+def test_wrap_task_output():
+
+    t = TaskResult(values={'v': 1}, artifacts={})
+    assert t == Pipeline._wrap_task_output({'values': {'v': 1}}, 'task_name')
+    assert t == Pipeline._wrap_task_output(t, 'task_name')
+
+    with pytest.raises(InvalidTaskResultError) as ex:
+        Pipeline._wrap_task_output([1], 'task_name')
+
+    assert "Task task_name returned invalid result of type <class 'list'>, " \
+           "expected either a dict or a TaskResult" in str(ex.value)

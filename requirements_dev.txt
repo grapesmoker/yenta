@@ -13,3 +13,4 @@ pytest-runner==5.2
 networkx==2.4
 mypy==0.780
 colorama==0.4.3
+sphinx_rtd_theme==0.4.3

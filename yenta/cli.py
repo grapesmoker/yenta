@@ -109,7 +109,7 @@ def task_info(task_name):
         task = more_itertools.one(filter(lambda t: t.task_def.name == task_name, tasks))
         print(Fore.WHITE + Style.BRIGHT + 'Information for task ' + Fore.GREEN + task_name + Fore.WHITE + ':')
         deps = ', '.join(task.task_def.depends_on) if task.task_def.depends_on else 'None'
-        print('Dependencies:', Fore.GREEN, deps, Fore.WHITE)
+        print('Dependencies:', Fore.GREEN + deps + Fore.WHITE)
         task_result = pipeline_data.task_results.get(task_name, None)
         marker = 'Did not run'
         if task_result and task_result.status == TaskStatus.SUCCESS:
@@ -135,7 +135,7 @@ def rm(task_name):
     if task_name in pipeline_data.task_results:
         del pipeline_data.task_results[task_name]
     else:
-        print(Fore.WHITE + Style.BRIGHT + 'Unknown task ' + Fore.RED + task_name + Fore.WHITE + ' specified')
+        print(Fore.WHITE + Style.BRIGHT + 'Unknown task ' + Fore.RED + task_name + Fore.WHITE + ' specified.')
     if task_name in pipeline_data.task_inputs:
         del pipeline_data.task_inputs[task_name]
 

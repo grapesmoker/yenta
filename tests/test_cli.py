@@ -3,11 +3,13 @@
 """Tests for `yenta` package."""
 
 import pytest
+import json
 
 from pathlib import Path
 from click.testing import CliRunner
 
 from yenta import cli
+from yenta.pipeline.Pipeline import PipelineResult
 
 
 @pytest.fixture
@@ -98,7 +100,7 @@ def test_run_tasks():
         Path(pipeline_store).unlink()
 
 
-def test_show_info():
+def test_show_config():
 
     runner = CliRunner()
     entry_point = 'tests/sample_pipelines/sample_pipeline_1.py'
@@ -115,3 +117,117 @@ def test_show_info():
     assert output_lines[3] == 'No log output configured'
     assert output_lines[4] == 'Tasks will be executed in the following order: bar, foo, baz'
     print(result.output)
+
+
+def test_task_info():
+
+    runner = CliRunner()
+    entry_point = 'tests/sample_pipelines/sample_pipeline_1.py'
+    pipeline_store = 'tests/sample_pipelines/sample_pipeline_1.json'
+    if Path(pipeline_store).exists():
+        Path(pipeline_store).unlink()
+
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
+                                       '--pipeline', pipeline_store,
+                                       'task-info', 'nonexistent-task'])
+
+    assert result.exit_code == 0
+    assert result.output == 'Unknown task nonexistent-task specified.\n'
+
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
+                                       '--pipeline', pipeline_store,
+                                       'run'])
+
+    assert result.exit_code == 0
+    assert Path(pipeline_store).exists()
+
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
+                                       '--pipeline', pipeline_store,
+                                       'task-info', 'foo'])
+
+    output_lines = result.output.split('\n')
+    assert output_lines[0] == 'Information for task foo:'
+    assert output_lines[1] == 'Dependencies: None'
+    assert output_lines[2] == 'Previous status: \u2714'
+
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
+                                       '--pipeline', pipeline_store,
+                                       'task-info', 'bar'])
+
+    output_lines = result.output.split('\n')
+    assert output_lines[0] == 'Information for task bar:'
+    assert output_lines[1] == 'Dependencies: None'
+    assert output_lines[2] == 'Previous status: \u2718 oh noes'
+
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
+                                       '--pipeline', pipeline_store,
+                                       'task-info', 'baz'])
+
+    output_lines = result.output.split('\n')
+    assert output_lines[0] == 'Information for task baz:'
+    assert output_lines[1] == 'Dependencies: foo, bar'
+    assert output_lines[2] == 'Previous status: Did not run'
+
+    if Path(pipeline_store).exists():
+        Path(pipeline_store).unlink()
+
+
+def test_rm_task():
+
+    runner = CliRunner()
+    entry_point = 'tests/sample_pipelines/sample_pipeline_1.py'
+    pipeline_store = 'tests/sample_pipelines/sample_pipeline_1.json'
+    if Path(pipeline_store).exists():
+        Path(pipeline_store).unlink()
+
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
+                                       '--pipeline', pipeline_store,
+                                       'run'])
+
+    assert result.exit_code == 0
+    assert Path(pipeline_store).exists()
+
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
+                                       '--pipeline', pipeline_store,
+                                       'rm', 'foo'])
+
+    assert result.exit_code == 0
+    assert Path(pipeline_store).exists()
+
+    with open(pipeline_store, 'r') as f:
+        pipeline = PipelineResult(**json.load(f))
+
+    with pytest.raises(KeyError) as ex:
+        _ = pipeline.values('foo', 'whatever')
+
+    assert 'foo' in str(ex.value)
+
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
+                                       '--pipeline', pipeline_store,
+                                       'rm', 'nonexistent-task'])
+
+    assert result.exit_code == 0
+    assert result.output == 'Unknown task nonexistent-task specified.\n'
+
+    if Path(pipeline_store).exists():
+        Path(pipeline_store).unlink()
+
+
+def test_dump_task_graph():
+
+    runner = CliRunner()
+    entry_point = 'tests/sample_pipelines/sample_pipeline_1.py'
+    pipeline_store = 'tests/sample_pipelines/sample_pipeline_1.json'
+    if Path(pipeline_store).exists():
+        Path(pipeline_store).unlink()
+
+    task_graph = 'tests/sample_pipelines/sample_task_graph.png'
+
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
+                                       '--pipeline', pipeline_store,
+                                       'dump-task-graph', task_graph])
+
+    assert result.exit_code == 0
+    assert Path(task_graph).exists()
+
+    Path(task_graph).unlink()
