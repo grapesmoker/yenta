@@ -8,7 +8,6 @@ from yenta.utils.files import file_hash
 @dataclass
 class Artifact:
 
-    name: str
     location: str
     date_created: str
     hash: Optional[str] = None

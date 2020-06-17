@@ -1,15 +1,21 @@
 import json
 import networkx as nx
+import logging
 
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
-from typing import Dict
+from typing import Dict, List
 from enum import Enum
+from more_itertools import split_after
+from colorama import Fore, Style
 
 from yenta.config import settings
 from yenta.tasks.Task import TaskDef, ParameterType, ResultSpec
 from yenta.artifacts.Artifact import Artifact
 from yenta.values.Value import Value
+
+
+logger = logging.getLogger(__name__)
 
 
 class InvalidTaskResultError(Exception):
@@ -32,6 +38,7 @@ class TaskResult:
     values: Dict[str, Value] = field(default_factory=dict)
     artifacts: Dict[str, Artifact] = field(default_factory=dict)
     status: TaskStatus = None
+    error: str = None
 
     def __post_init__(self):
 
@@ -83,11 +90,13 @@ class Pipeline:
 
     def build_task_graph(self):
 
+        logger.debug('Building task graph')
         for task in self._tasks:
             self.task_graph.add_node(task.task_def.name, task=task)
             for dependency in (task.task_def.depends_on or []):
                 self.task_graph.add_edge(dependency, task.task_def.name)
 
+        logger.debug('Computing execution order')
         self.execution_order = list(nx.algorithms.dag.lexicographical_topological_sort(self.task_graph))
 
     @staticmethod
@@ -106,6 +115,7 @@ class Pipeline:
     @staticmethod
     def build_args_dict(task, args: PipelineResult):
 
+        logger.debug('Building args dictionary')
         task_def: TaskDef = task.task_def
         args_dict = {}
 
@@ -123,6 +133,12 @@ class Pipeline:
         return self._wrap_task_output(output, task.task_def.name)
 
     @staticmethod
+    def merge_pipeline_results(res1: PipelineResult, res2: PipelineResult):
+
+        return PipelineResult(task_results={**res1.task_results, **res2.task_results},
+                              task_inputs={**res1.task_inputs, **res2.task_inputs})
+
+    @staticmethod
     def cache_pipeline_result(cache_file: Path, result: PipelineResult):
 
         with open(cache_file, 'w') as f:
@@ -130,7 +146,7 @@ class Pipeline:
 
     @staticmethod
     def load_pipeline():
-
+        logger.debug(f'Loading pipeline from {settings.YENTA_JSON_STORE_PATH}')
         if settings.YENTA_JSON_STORE_PATH.exists():
             with open(settings.YENTA_JSON_STORE_PATH, 'r') as f:
                 pipeline = PipelineResult(**json.load(f))
@@ -147,12 +163,13 @@ class Pipeline:
 
         return False
 
-    def run_pipeline(self):
+    def run_pipeline(self, up_to: str = None, force_rerun: List[str] = None):
 
         previous_result: PipelineResult = self.load_pipeline()
         result = PipelineResult()
 
-        for task_name in self.execution_order:
+        for task_name in list(split_after(self.execution_order, lambda x: x == up_to))[0]:
+            logger.debug(f'Starting executions of {task_name}')
             task = self.task_graph.nodes[task_name]['task']
             args = PipelineResult()
             dependencies_succeeded = True
@@ -162,22 +179,31 @@ class Pipeline:
                     dependencies_succeeded = False
 
             if dependencies_succeeded:
-
-                if self.reuse_inputs(task_name, previous_result, args):
+                marker = ''
+                if task_name not in (force_rerun or []) and self.reuse_inputs(task_name, previous_result, args):
+                    logger.debug(f'Reusing previous results of {task_name}')
                     self._tasks_reused.add(task_name)
                     output = previous_result.task_results[task_name]
+                    marker = Fore.YELLOW + u'\u2014' + Fore.WHITE
                 else:
                     self._tasks_executed.add(task_name)
                     args_dict = self.build_args_dict(task, args)
+                    marker = ''
                     try:
+                        logger.debug(f'Calling function to execute {task_name}')
                         output = self.invoke_task(task, **args_dict)
                         output.status = TaskStatus.SUCCESS
-                    except Exception:
-                        output = TaskResult(status=TaskStatus.FAILURE)
+                        marker = Fore.GREEN + u'\u2714' + Fore.WHITE
+                    except Exception as ex:
+                        logger.error(f'Caught exception executing {task_name}: {ex}')
+                        output = TaskResult(status=TaskStatus.FAILURE, error=str(ex))
+                        marker = Fore.RED + u'\u2718' + Fore.WHITE
+                print(Fore.WHITE + Style.BRIGHT + f'[{marker}] {task_name}')
 
                 result.task_results[task_name] = output
                 result.task_inputs[task_name] = args
 
-                self.cache_pipeline_result(settings.YENTA_JSON_STORE_PATH, result)
+                self.cache_pipeline_result(settings.YENTA_JSON_STORE_PATH,
+                                           self.merge_pipeline_results(previous_result, result))
 
         return result
