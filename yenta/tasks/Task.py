@@ -21,7 +21,7 @@ class ResultType(str, Enum):
 class ResultSpec:
 
     result_task_name: str
-    resut_type: ResultType
+    result_type: ResultType
     result_var_name: str
 
 

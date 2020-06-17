@@ -84,7 +84,7 @@ class PipelineResult:
         return self.task_results[task_name].artifacts[artifact_name]
 
     def from_spec(self, spec: ResultSpec):
-        func = getattr(self, spec.resut_type)
+        func = getattr(self, spec.result_type)
         return func(spec.result_task_name, spec.result_var_name)
 
 
