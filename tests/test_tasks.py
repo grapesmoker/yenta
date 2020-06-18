@@ -1,6 +1,6 @@
 import pytest
 
-from yenta.tasks.Task import (
+from yenta.tasks import (
     task, build_parameter_spec, TaskDef, InvalidTaskDefinitionError, ParameterSpec,
     ParameterType, ResultSpec, ResultType
 )

@@ -3,7 +3,7 @@ import string
 from datetime import datetime
 from pathlib import Path
 
-from yenta.artifacts.Artifact import Artifact, FileArtifact
+from yenta.artifacts import Artifact, FileArtifact
 
 
 def test_artifact_equality():

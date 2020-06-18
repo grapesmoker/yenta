@@ -9,7 +9,7 @@ from pathlib import Path
 from click.testing import CliRunner
 
 from yenta import cli
-from yenta.pipeline.Pipeline import PipelineResult
+from yenta.pipeline import PipelineResult
 
 
 @pytest.fixture

@@ -6,9 +6,9 @@ from pathlib import Path
 
 from yenta.config import settings
 from yenta.tasks.Task import task
-from yenta.pipeline.Pipeline import Pipeline, TaskResult, PipelineResult, InvalidTaskResultError
-from yenta.values.Value import Value
-from yenta.artifacts.Artifact import FileArtifact
+from yenta.pipeline import Pipeline, TaskResult, PipelineResult, InvalidTaskResultError
+from yenta.values import Value
+from yenta.artifacts import FileArtifact
 
 settings.YENTA_JSON_STORE_PATH = Path('tests/tmp/pipeline.json')
 
