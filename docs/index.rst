@@ -8,6 +8,7 @@ Welcome to Yenta's documentation!
    readme
    installation
    usage
+   qa
    modules
    contributing
    authors

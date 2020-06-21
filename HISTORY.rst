@@ -6,3 +6,5 @@ History
 ------------------
 
 * First release on PyPI.
+* Working pipeline execution with caching and reuse of results
+

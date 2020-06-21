@@ -26,29 +26,24 @@ Introduction
 ------------
 
 Yenta is YEt 'Nother TAskrunner; it executes a pipeline, defined by a series of tasks and dependencies among them.
-The goal of Yenta is to provide a reasonable feature set while maintaining simplicity and usability as both a
-library and a command-line tool.
+The goal of Yenta is to provide a reasonable feature set while maintaining simplicity and usability. Yenta tasks are
+simply functions decorated with the :code:`@task` decorator and complying with a specific format for their arguments.
+
+Yenta is inspired in part by the functional state management pattern used in projects like Redux. Although I would
+hesitate to call Yenta "functional" in the strict sense, it does use a caching logic according to which identical
+inputs are assumed to produce identical outputs under default conditions. This means that Yenta will automatically
+reuse the cached output of a task if nothing about the inputs has changed.
 
 The name "Yenta" is an old Yiddish name; in the American Yiddish theater of the 30s, a character named Yenta
 was depicted as a busy-body, so the name became a byword for someone who won't mind their own business.
 
-
-Usage
-_____
-
-Yenta can be used as a library or invoked from the command line.
-
-Library
-=======
-
-    .. code-block:: python
-
-        pass
-
 Features
 --------
 
-* TODO
+* Graph-based task execution
+* Lightweight
+* Idempotent tasks
+* Simple, intuitive API
 
 Credits
 -------

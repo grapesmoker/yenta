@@ -7,10 +7,9 @@ import importlib.util
 import more_itertools
 import json
 import networkx as nx
-import matplotlib.pyplot as plt
 
 from dataclasses import asdict
-from colorama import init, Fore, Back, Style
+from colorama import init, Fore, Style
 from pathlib import Path
 from yenta.config import settings
 from yenta.config import logging
@@ -33,12 +32,12 @@ def load_tasks(entry_file):
 
 
 @click.group()
-@click.option('--config-file', default=settings.YENTA_CONFIG_FILE, type=Path)
-@click.option('--pipeline', type=Path)
-@click.option('--entry-point', type=Path)
-@click.option('--log-file', type=Path)
-@click.option('--verbose', default=False, type=bool)
-def yenta(config_file, pipeline, entry_point, log_file, verbose):
+@click.option('--config-file', default=settings.YENTA_CONFIG_FILE, type=Path,
+              help='The config file from which to read settings.')
+@click.option('--pipeline', type=Path, help='The file to which the pipeline will be cached.')
+@click.option('--entry-point', type=Path, help='The file containing the task definitions.')
+@click.option('--log-file', type=Path, help='The file to which the logs should be written.')
+def yenta(config_file, pipeline, entry_point, log_file):
 
     init()
 
@@ -61,10 +60,9 @@ def yenta(config_file, pipeline, entry_point, log_file, verbose):
     settings.YENTA_LOG_FILE = log_file or \
                               conf_log_path or \
                               settings.YENTA_LOG_FILE
-    settings.VERBOSE = verbose or bool(cf['yenta'].get('verbose', False)) or settings.VERBOSE
 
 
-@yenta.command()
+@yenta.command(help='List all available tasks.')
 def list_tasks():
 
     tasks = load_tasks(settings.YENTA_ENTRY_POINT)
@@ -83,7 +81,7 @@ def list_tasks():
         print(Fore.WHITE + Style.BRIGHT + f'[{marker}] {task_name}')
 
 
-@yenta.command()
+@yenta.command(help='Show the current configuration.')
 def show_config():
 
     tasks = load_tasks(settings.YENTA_ENTRY_POINT)
@@ -99,7 +97,7 @@ def show_config():
     print('Tasks will be executed in the following order: ' + Fore.GREEN + ', '.join(pipeline.execution_order))
 
 
-@yenta.command()
+@yenta.command(help='Show information about a specific task.')
 @click.argument('task-name')
 def task_info(task_name):
 
@@ -126,7 +124,7 @@ def task_info(task_name):
         print(Fore.WHITE + Style.BRIGHT + 'Unknown task ' + Fore.RED + task_name + Fore.WHITE + ' specified.')
 
 
-@yenta.command()
+@yenta.command(help='Remove a task from the pipeline cache.')
 @click.argument('task-name')
 def rm(task_name):
 
@@ -143,19 +141,23 @@ def rm(task_name):
         json.dump(asdict(pipeline_data), f, indent=4)
 
 
-@yenta.command()
+@yenta.command(help='Dump the task graph to a file; requires Matplotlib.')
 @click.argument('filename', type=click.Path())
 def dump_task_graph(filename):
 
-    tasks = load_tasks(settings.YENTA_ENTRY_POINT)
-    pipeline = Pipeline(*tasks)
-    nx.draw_networkx(pipeline.task_graph)
-    plt.savefig(filename)
+    try:
+        import matplotlib.pyplot as plt
+        tasks = load_tasks(settings.YENTA_ENTRY_POINT)
+        pipeline = Pipeline(*tasks)
+        nx.draw_networkx(pipeline.task_graph)
+        plt.savefig(filename)
+    except ImportError as ex:
+        print(Fore.WHITE + Style.BRIGHT + f'Matplotlib must be installed to dump the task graph: {ex}')
 
 
-@yenta.command()
-@click.option('--up-to')
-@click.option('--force-rerun', '-f', multiple=True, default=[])
+@yenta.command(help='Run the pipeline.')
+@click.option('--up-to', help='Optionally run the pipeline up to and including a given task.')
+@click.option('--force-rerun', '-f', multiple=True, default=[], help='Force specified tasks to rerun.')
 def run(up_to=None, force_rerun=None):
 
     logger.info('Running the pipeline')

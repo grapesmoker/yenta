@@ -288,6 +288,8 @@ class Pipeline:
 
         previous_result: PipelineResult = self.load_pipeline()
         result = PipelineResult()
+        self._tasks_reused.clear()
+        self._tasks_executed.clear()
 
         for task_name in list(split_after(self.execution_order, lambda x: x == up_to))[0]:
             logger.debug(f'Starting executions of {task_name}')
@@ -300,25 +302,25 @@ class Pipeline:
                     dependencies_succeeded = False
 
             if dependencies_succeeded:
-                marker = ''
-                if task_name not in (force_rerun or []) and self.reuse_inputs(task_name, previous_result, args):
+                if task.task_def.pure and task_name not in (force_rerun or []) and \
+                        self.reuse_inputs(task_name, previous_result, args):
                     logger.debug(f'Reusing previous results of {task_name}')
                     self._tasks_reused.add(task_name)
                     output = previous_result.task_results[task_name]
                     marker = Fore.YELLOW + u'\u2014' + Fore.WHITE
                 else:
-                    self._tasks_executed.add(task_name)
                     args_dict = self.build_args_dict(task, args)
-                    marker = ''
                     try:
                         logger.debug(f'Calling function to execute {task_name}')
                         output = self.invoke_task(task, **args_dict)
                         output.status = TaskStatus.SUCCESS
                         marker = Fore.GREEN + u'\u2714' + Fore.WHITE
+                        self._tasks_executed.add(task_name)
                     except Exception as ex:
                         logger.error(f'Caught exception executing {task_name}: {ex}')
                         output = TaskResult(status=TaskStatus.FAILURE, error=str(ex))
                         marker = Fore.RED + u'\u2718' + Fore.WHITE
+
                 print(Fore.WHITE + Style.BRIGHT + f'[{marker}] {task_name}')
 
                 result.task_results[task_name] = output

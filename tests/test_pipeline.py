@@ -43,7 +43,7 @@ def test_run_pipeline_with_past_results():
         return TaskResult({'x': Value(1)}, {})
 
     @task
-    def bar(previous_results=None):
+    def bar():
         return TaskResult({'y': Value(2)}, {})
 
     @task(depends_on=['foo', 'bar'])
@@ -72,8 +72,8 @@ def test_pipeline_run_with_explicit_params():
         settings.YENTA_JSON_STORE_PATH.unlink()
 
     @task
-    def foo() -> TaskResult:
-        return TaskResult({'x': Value(1)}, {})
+    def foo():
+        return {'values': {'x': Value(1)}}
 
     @task
     def bar():
@@ -125,7 +125,7 @@ def test_pipeline_run_with_artifacts():
     def foo() -> TaskResult:
         with open(foo_file, 'w') as f:
             f.write('foo')
-        return TaskResult({'x': Value(1)},
+        return TaskResult({'x': 1},
                           {'foo_file': FileArtifact(foo_file, str(datetime.now()))})
 
     @task
