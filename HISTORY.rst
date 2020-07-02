@@ -8,3 +8,7 @@ History
 * First release on PyPI.
 * Working pipeline execution with caching and reuse of results
 
+0.2.0 (2020-07-01)
+------------------
+
+* Selector functionality implemented
