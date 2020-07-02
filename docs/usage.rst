@@ -52,10 +52,11 @@ Tasks are defined by decorating functions with the :code:`@task` decorator. The 
 arguments called :code:`depends_on` which lists the names of the tasks on which that task depends. Above, the
 tasks :code:`foo` and :code:`bar` do not depend on anything, while the task :code:`baz` depends on both of them.
 
-The signature of a task function is a key feature of Yenta. Tasks can receive their arguments using two different
-strategies: they can either receive the results of task execution of their dependencies as one state blob, or they
-can select slices of the state via annotations. In the above example, the :code:`baz` task takes as its arguments
-two values, :code:`u` and :code:`v`, which are annotated as paths into the state. The format of the annotation is:
+The signature of a task function is a key feature of Yenta. Tasks can receive their arguments using three different
+strategies: they can either receive the results of task execution of their dependencies as one state blob, they
+can select slices of the state via annotations, or they can select slices of state via selector functions. In the
+above example, the :code:`baz` task takes as its arguments two values, :code:`u` and :code:`v`, which are annotated
+as paths into the state. The format of the annotation is:
 
 .. code-block:: python
 
@@ -107,6 +108,50 @@ or equivalently
 
     A task will only receive those slices of state which are indicated as part of its dependency chain. If you want
     state for a given task, your downstream task must have that other task as a dependency.
+
+Finally, you can also use selector functions to select pieces of state and possibly so something with them before
+passing them as arguments to the downstream task. To see how this is accomplished, consider the following snippet:
+
+.. code-block:: python
+
+    @task
+    def foo() -> TaskResult:
+        return TaskResult({'x': Value([1, 2, 3])})
+
+    @task
+    def bar():
+        return TaskResult({'y': [4, 5, 6]})
+
+    def foo_x_selector(result: PipelineResult):
+        return sum(result.values('foo', 'x'))
+
+    def bar_y_selector(result: PipelineResult):
+        return sum(result.values('bar', 'y'))
+
+    @task(depends_on=['foo', 'bar'], selectors={'x': foo_x_selector, 'y': bar_y_selector})
+    def baz(x, y):
+        sum_x_y = x + y
+        return TaskResult({'sum': Value(sum_x_y)})
+
+    pipeline = Pipeline(foo, bar, baz)
+    result = pipeline.run()
+
+    print(result.values('baz', 'sum'))
+
+    >>> 21
+
+The :code:`selectors` argument to the task decorator above is a dictionary whose keys are parameter names on the
+receiving task and whose values are functions which are to be called on the previous state. These functions receive
+the previous state in the form of a :class:`~yenta.pipeline.Pipeline.PipelineResult` object and can return any value
+at all. As the above example demonstrates, selectors can optionally perform some operations on the slice of state
+they extract.
+
+.. warning::
+
+    Selectors must be pure functions, i.e. they must not modify the state. If supplied, selectors will take precedence
+    over annotations. Although you `can` do meaningful work in the selector function, you mostly `should not`; the
+    purpose of selectors is to reshape the state into the form expected by the downstream task, but of course you
+    can always do that inside the task anyway.
 
 Return Values
 +++++++++++++

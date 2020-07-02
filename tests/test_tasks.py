@@ -29,6 +29,18 @@ def test_build_param_spec():
 
     assert(spec == expected_spec)
 
+    selector = lambda res: res
+    selectors = {'x': selector}
+
+    @task(selectors={'x': selector})
+    def baz(x):
+        pass
+
+    spec = build_parameter_spec(baz, selectors)
+    expected_spec = [ParameterSpec('x', ParameterType.EXPLICIT, None, selector)]
+
+    assert(spec == expected_spec)
+
 
 def test_invalid_param_spec():
 
@@ -40,7 +52,7 @@ def test_invalid_param_spec():
 
         _ = build_parameter_spec(foo)
 
-    assert('Annotation string missing' in str(ex.value))
+    assert('Annotation string or selector missing' in str(ex.value))
 
     with pytest.raises(InvalidTaskDefinitionError) as ex:
 

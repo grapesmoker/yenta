@@ -1,5 +1,6 @@
 import json
 import pytest
+import networkx as nx
 
 from datetime import datetime
 from pathlib import Path
@@ -31,6 +32,24 @@ def test_pipeline_creation():
     assert(pipeline.task_graph.has_edge('foo', 'baz'))
     assert(pipeline.task_graph.has_edge('bar', 'baz'))
     assert(not pipeline.task_graph.has_edge('foo', 'bar'))
+
+
+def test_pipeline_with_cycles():
+
+    @task(depends_on=['baz'])
+    def foo(previous_results=None):
+        pass
+
+    @task(depends_on=['foo'])
+    def bar():
+        pass
+
+    @task(depends_on=['bar'])
+    def baz(previous_results):
+        pass
+
+    with pytest.raises(nx.NetworkXUnfeasible):
+        pipeline = Pipeline(foo, bar, baz)
 
 
 def test_run_pipeline_with_past_results():
@@ -192,6 +211,43 @@ def test_pipeline_with_non_scalar_values():
     result = pipeline.run_pipeline()
     answer = result.values('baz', 'result')
     assert (answer == [1, 2, 3, 4, 5, 6])
+
+    if settings.YENTA_JSON_STORE_PATH.exists():
+        settings.YENTA_JSON_STORE_PATH.unlink()
+
+
+def test_pipeline_run_with_selectors():
+
+    if settings.YENTA_JSON_STORE_PATH.exists():
+        settings.YENTA_JSON_STORE_PATH.unlink()
+
+    @task
+    def foo() -> TaskResult:
+        return TaskResult({'x': Value([1, 2, 3])})
+
+    @task
+    def bar():
+        return TaskResult({'y': [4, 5, 6]})
+
+    def foo_x_selector(result: PipelineResult):
+        return sum(result.values('foo', 'x'))
+
+    def bar_y_selector(result: PipelineResult):
+        return sum(result.values('bar', 'y'))
+
+    @task(depends_on=['foo', 'bar'], selectors={'x': foo_x_selector, 'y': bar_y_selector})
+    def baz(x, y):
+        sum_x_y = x + y
+        return TaskResult({'result': Value(sum_x_y)})
+
+    pipeline = Pipeline(foo, bar, baz)
+
+    result = pipeline.run_pipeline()
+    answer = result.values('baz', 'result')
+    assert (answer == 21)
+
+    if settings.YENTA_JSON_STORE_PATH.exists():
+        settings.YENTA_JSON_STORE_PATH.unlink()
 
 
 def test_wrap_value():

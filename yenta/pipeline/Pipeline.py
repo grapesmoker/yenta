@@ -161,6 +161,7 @@ class Pipeline:
             self.execution_order = list(nx.algorithms.dag.lexicographical_topological_sort(self.task_graph))
         except nx.NetworkXUnfeasible as ex:
             print(Fore.RED + 'Unable to build execution graph because pipeline contains cyclic dependencies.')
+            raise ex
 
     @staticmethod
     def _wrap_task_output(raw_output: Union[dict, TaskResult], task_name: str) -> TaskResult:
@@ -201,8 +202,11 @@ class Pipeline:
         for spec in task_def.param_specs:
             if spec.param_type == ParameterType.PIPELINE_RESULTS:
                 args_dict[spec.param_name] = args
-            elif spec.param_type == ParameterType.EXPLICIT and spec.result_spec:
-                args_dict[spec.param_name] = args.from_spec(spec.result_spec)
+            elif spec.param_type == ParameterType.EXPLICIT:
+                if spec.selector:
+                    args_dict[spec.param_name] = spec.selector(args)
+                elif spec.result_spec:
+                    args_dict[spec.param_name] = args.from_spec(spec.result_spec)
 
         return args_dict
 
