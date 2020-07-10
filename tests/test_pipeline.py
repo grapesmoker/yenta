@@ -274,3 +274,32 @@ def test_wrap_task_output():
 
     assert "Task task_name returned invalid result of type <class 'list'>, " \
            "expected either a dict or a TaskResult" in str(ex.value)
+
+
+def test_non_serializable_result():
+
+    if settings.YENTA_JSON_STORE_PATH.exists():
+        settings.YENTA_JSON_STORE_PATH.unlink()
+
+    @task
+    def foo() -> TaskResult:
+        return TaskResult({'x': 1})
+
+    # a task with a non-serializable result
+    @task(depends_on=['foo'])
+    def bar():
+        return TaskResult({'y': Path('abc')})
+
+    @task(depends_on=['bar'])
+    def baz():
+        return TaskResult({'z': 2})
+
+    pipeline = Pipeline(foo, bar)
+
+    # we'll have an exception that will prevent baz from running
+    result = pipeline.run_pipeline()
+
+    with open(settings.YENTA_JSON_STORE_PATH, 'r') as f:
+        cached_result = json.load(f)
+        assert result == PipelineResult(**cached_result)
+        assert 'baz' not in cached_result

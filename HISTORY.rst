@@ -12,3 +12,9 @@ History
 ------------------
 
 * Selector functionality implemented
+
+0.2.1 (2020-07-10)
+------------------
+
+* Write intermediate pipeline results to a temp file and catch the case
+  where a non-serializable object is returned
