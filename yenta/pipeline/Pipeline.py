@@ -1,6 +1,9 @@
+import io
 import json
 import networkx as nx
 import logging
+import shutil
+import tempfile
 
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
@@ -238,7 +241,7 @@ class Pipeline:
                               task_inputs={**res1.task_inputs, **res2.task_inputs})
 
     @staticmethod
-    def cache_pipeline_result(cache_file: Path, result: PipelineResult):
+    def cache_pipeline_result(cache_file: io.BufferedRandom, result: PipelineResult):
         """ Write the pipeline results to a file.
 
         :param Path cache_file: The file to which the results should be written.
@@ -246,8 +249,15 @@ class Pipeline:
         :return: None
         """
 
-        with open(cache_file, 'w') as f:
-            json.dump(asdict(result), f, indent=4)
+        try:
+            result = json.dumps(asdict(result), indent=4)
+            cache_file.truncate(0)
+            cache_file.flush()
+            cache_file.write(result.encode('utf-8'))
+            cache_file.flush()
+        except json.JSONDecodeError as ex:
+            logger.error(f'Failed to encode pipeline result: {ex}')
+            raise InvalidTaskResultError(str(ex))
 
     @staticmethod
     def load_pipeline() -> PipelineResult:
@@ -295,42 +305,48 @@ class Pipeline:
         self._tasks_reused.clear()
         self._tasks_executed.clear()
 
-        for task_name in list(split_after(self.execution_order, lambda x: x == up_to))[0]:
-            logger.debug(f'Starting executions of {task_name}')
-            task = self.task_graph.nodes[task_name]['task']
-            args = PipelineResult()
-            dependencies_succeeded = True
-            for dependency in (task.task_def.depends_on or []):
-                args.task_results[dependency] = result.task_results[dependency]
-                if result.task_results[dependency].status == TaskStatus.FAILURE:
-                    dependencies_succeeded = False
+        with tempfile.NamedTemporaryFile(delete=False) as cache:
 
-            if dependencies_succeeded:
-                if task.task_def.pure and task_name not in (force_rerun or []) and \
-                        self.reuse_inputs(task_name, previous_result, args):
-                    logger.debug(f'Reusing previous results of {task_name}')
-                    self._tasks_reused.add(task_name)
-                    output = previous_result.task_results[task_name]
-                    marker = Fore.YELLOW + u'\u2014' + Fore.WHITE
-                else:
-                    args_dict = self.build_args_dict(task, args)
-                    try:
-                        logger.debug(f'Calling function to execute {task_name}')
-                        output = self.invoke_task(task, **args_dict)
-                        output.status = TaskStatus.SUCCESS
-                        marker = Fore.GREEN + u'\u2714' + Fore.WHITE
-                        self._tasks_executed.add(task_name)
-                    except Exception as ex:
-                        logger.error(f'Caught exception executing {task_name}: {ex}')
-                        output = TaskResult(status=TaskStatus.FAILURE, error=str(ex))
-                        marker = Fore.RED + u'\u2718' + Fore.WHITE
+            for task_name in list(split_after(self.execution_order, lambda x: x == up_to))[0]:
+                logger.debug(f'Starting executions of {task_name}')
+                task = self.task_graph.nodes[task_name]['task']
+                args = PipelineResult()
+                dependencies_succeeded = True
+                for dependency in (task.task_def.depends_on or []):
+                    args.task_results[dependency] = result.task_results[dependency]
+                    if result.task_results[dependency].status == TaskStatus.FAILURE:
+                        dependencies_succeeded = False
 
-                print(Fore.WHITE + Style.BRIGHT + f'[{marker}] {task_name}')
+                if dependencies_succeeded:
+                    if task.task_def.pure and task_name not in (force_rerun or []) and \
+                            self.reuse_inputs(task_name, previous_result, args):
+                        logger.debug(f'Reusing previous results of {task_name}')
+                        self._tasks_reused.add(task_name)
+                        output = previous_result.task_results[task_name]
+                        marker = Fore.YELLOW + u'\u2014' + Fore.WHITE
+                    else:
+                        args_dict = self.build_args_dict(task, args)
+                        try:
+                            logger.debug(f'Calling function to execute {task_name}')
+                            output = self.invoke_task(task, **args_dict)
+                            output.status = TaskStatus.SUCCESS
+                            marker = Fore.GREEN + u'\u2714' + Fore.WHITE
+                            self._tasks_executed.add(task_name)
+                        except Exception as ex:
+                            logger.error(f'Caught exception executing {task_name}: {ex}')
+                            output = TaskResult(status=TaskStatus.FAILURE, error=str(ex))
+                            marker = Fore.RED + u'\u2718' + Fore.WHITE
 
-                result.task_results[task_name] = output
-                result.task_inputs[task_name] = args
+                    print(Fore.WHITE + Style.BRIGHT + f'[{marker}] {task_name}')
 
-                self.cache_pipeline_result(settings.YENTA_JSON_STORE_PATH,
-                                           self.merge_pipeline_results(previous_result, result))
+                    result.task_results[task_name] = output
+                    result.task_inputs[task_name] = args
+
+                    self.cache_pipeline_result(cache, self.merge_pipeline_results(previous_result, result))
+
+            cache.seek(0)
+            full_results = cache.read().decode('utf-8').strip('\x00')
+            with open(settings.YENTA_JSON_STORE_PATH, 'w') as f:
+                f.write(full_results)
 
         return result
