@@ -7,6 +7,7 @@ import importlib.util
 import more_itertools
 import json
 import networkx as nx
+import os
 
 from dataclasses import asdict
 from colorama import init, Fore, Style
@@ -40,6 +41,10 @@ def load_tasks(entry_file):
 def yenta(config_file, pipeline, entry_point, log_file):
 
     init()
+
+    # append the local path we're running from so that we can allow
+    # the project to import normally when running via CLI
+    sys.path.append(os.getcwd())
 
     cf = configparser.ConfigParser()
     cf.read(config_file or settings.YENTA_CONFIG_FILE)
