@@ -28,8 +28,6 @@ def test_file_artifact_equality():
 
 def test_file_artifact_hash():
 
-    now = str(datetime.now())
-
     data = 'some nice data'
 
     output_file = Path('tests').resolve() / 'tmp' / 'artifact.test'
@@ -37,7 +35,7 @@ def test_file_artifact_hash():
     with open(output_file, 'w') as f:
         f.write(data)
 
-    art = FileArtifact(location=output_file, date_created=now)
+    art = FileArtifact(location=output_file)
     art.hash = art.artifact_hash()
 
     assert(art.hash == '6a52cbb539857eb8c7353cadda0054996dea6de8')
