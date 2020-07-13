@@ -28,7 +28,7 @@ class FileArtifact(Artifact):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._path: Path = Path(self.location)
-        if self._path.exists():
+        if self._path.exists() and not self._path.is_dir():
             self.hash = self.artifact_hash()
 
     def artifact_hash(self):
