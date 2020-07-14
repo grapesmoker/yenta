@@ -22,6 +22,10 @@ class Artifact:
         if not self.date_created:
             self.date_created = str(datetime.now())
 
+    def __eq__(self, other):
+
+        return self.location == other.location and self.hash == other.hash
+
 
 @dataclass
 class FileArtifact(Artifact):
