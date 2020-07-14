@@ -148,16 +148,21 @@ def rm(task_name):
 
 @yenta.command(help='Dump the task graph to a file; requires Matplotlib.')
 @click.argument('filename', type=click.Path())
-def dump_task_graph(filename):
+@click.option('--layout', help='The networkx layout to use. Defaults to spring', default='spring')
+def dump_task_graph(filename, layout):
 
     try:
         import matplotlib.pyplot as plt
         tasks = load_tasks(settings.YENTA_ENTRY_POINT)
         pipeline = Pipeline(*tasks)
-        nx.draw_networkx(pipeline.task_graph)
+        layout_func = getattr(nx.drawing, f'{layout}_layout')
+        pos = layout_func(pipeline.task_graph)
+        nx.draw_networkx(pipeline.task_graph, pos=pos)
         plt.savefig(filename)
     except ImportError as ex:
         print(Fore.WHITE + Style.BRIGHT + f'Matplotlib must be installed to dump the task graph: {ex}')
+    except AttributeError as ex:
+        print(Fore.WHITE + Style.BRIGHT + f'Invalid layout `{layout}` specified: {ex}')
 
 
 @yenta.command(help='Run the pipeline.')

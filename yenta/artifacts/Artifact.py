@@ -12,6 +12,7 @@ class Artifact:
     location: str
     date_created: str = None
     hash: Optional[str] = None
+    meta: dict = None
 
     def artifact_hash(self):
         raise NotImplementedError
