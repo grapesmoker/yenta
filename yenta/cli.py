@@ -6,9 +6,9 @@ import configparser
 import importlib.util
 import more_itertools
 import json
-import networkx as nx
 import os
 
+from networkx.drawing.nx_pydot import to_pydot
 from dataclasses import asdict
 from colorama import init, Fore, Style
 from pathlib import Path
@@ -146,23 +146,14 @@ def rm(task_name):
         json.dump(asdict(pipeline_data), f, indent=4)
 
 
-@yenta.command(help='Dump the task graph to a file; requires Matplotlib.')
+@yenta.command(help='Dump the task graph to a DOT file.')
 @click.argument('filename', type=click.Path())
-@click.option('--layout', help='The networkx layout to use. Defaults to spring', default='spring')
-def dump_task_graph(filename, layout):
+def dump_task_graph(filename: Path):
 
-    try:
-        import matplotlib.pyplot as plt
-        tasks = load_tasks(settings.YENTA_ENTRY_POINT)
-        pipeline = Pipeline(*tasks)
-        layout_func = getattr(nx.drawing, f'{layout}_layout')
-        pos = layout_func(pipeline.task_graph)
-        nx.draw_networkx(pipeline.task_graph, pos=pos)
-        plt.savefig(filename)
-    except ImportError as ex:
-        print(Fore.WHITE + Style.BRIGHT + f'Matplotlib must be installed to dump the task graph: {ex}')
-    except AttributeError as ex:
-        print(Fore.WHITE + Style.BRIGHT + f'Invalid layout `{layout}` specified: {ex}')
+    tasks = load_tasks(settings.YENTA_ENTRY_POINT)
+    pipeline = Pipeline(*tasks)
+    pydot_graph = to_pydot(pipeline.task_graph)
+    pydot_graph.write(filename)
 
 
 @yenta.command(help='Run the pipeline.')
