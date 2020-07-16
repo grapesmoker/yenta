@@ -1,22 +1,20 @@
 import io
 import json
-import networkx as nx
 import logging
-import shutil
 import tempfile
-
 from dataclasses import dataclass, field, asdict
-from pathlib import Path
-from typing import Dict, List, Union, Any, Callable
 from enum import Enum
-from more_itertools import split_after
-from colorama import Fore, Style
+from pathlib import Path
+from typing import Dict, List, Union, Any
 
+import networkx as nx
+from colorama import Fore, Style
+from more_itertools import split_after
+
+from yenta.artifacts.Artifact import Artifact
 from yenta.config import settings
 from yenta.tasks.Task import TaskDef, ParameterType, ResultSpec
-from yenta.artifacts.Artifact import Artifact
 from yenta.values.Value import Value
-
 
 logger = logging.getLogger(__name__)
 
