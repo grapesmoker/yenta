@@ -35,11 +35,6 @@ def test_command_line_interface():
     assert result.exit_code == 0
     for cmd in ['dump-task-graph', 'list-tasks', 'rm', 'run', 'show-config', 'task-info']:
         assert cmd in result.output
-#
-#     # Path('pipeline.json').unlink()
-#     # help_result = runner.invoke(cli.yenta, ['--help'])
-#     # assert help_result.exit_code == 0
-#     # assert '--help  Show this message and exit.' in help_result.output
 
 
 def test_list_tasks():
@@ -77,24 +72,26 @@ def test_run_tasks():
 
     # bar errors, foo runs, baz never gets called
     output_lines = result.output.split('\n')
-    assert output_lines[0] == '[\u2718] bar'
-    assert output_lines[1] == 'hello from foo task'
-    assert output_lines[2] == '[\u2714] foo'
+    ind = output_lines.index('[\u2718] bar')
+    assert ind >= 0
+    assert output_lines[ind + 1] == 'hello from foo task'
+    assert output_lines[ind + 2] == '[\u2714] foo'
 
     result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline', pipeline_store, 'run'])
 
     # bar still errors, foo recycles the old value, baz still not called
     output_lines = result.output.split('\n')
-    assert output_lines[0] == '[\u2718] bar'
-    assert output_lines[1] == '[\u2014] foo'
+    ind = output_lines.index('[\u2718] bar')
+    assert ind >= 0
+    assert output_lines[ind + 1] == '[\u2014] foo'
 
     result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline', pipeline_store, 'list-tasks'])
 
     output_lines = result.output.split('\n')
-    assert output_lines[0] == 'The following tasks are available:'
-    assert output_lines[1] == '[\u2714] foo'
-    assert output_lines[2] == '[\u2718] bar'
-    assert output_lines[3] == '[ ] baz'
+    ind = output_lines.index('The following tasks are available:')
+    assert output_lines[ind + 1] == '[\u2714] foo'
+    assert output_lines[ind + 2] == '[\u2718] bar'
+    assert output_lines[ind + 3] == '[ ] baz'
 
     if Path(pipeline_store).exists():
         Path(pipeline_store).unlink()

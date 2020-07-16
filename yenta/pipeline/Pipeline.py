@@ -332,7 +332,9 @@ class Pipeline:
                             self._tasks_executed.add(task_name)
                         except Exception as ex:
                             import traceback
+                            print(Fore.RED)
                             traceback.print_exc()
+                            print(Fore.WHITE)
                             logger.error(f'Caught exception executing {task_name}: {ex}')
                             output = TaskResult(status=TaskStatus.FAILURE, error=str(ex))
                             marker = Fore.RED + u'\u2718' + Fore.WHITE
