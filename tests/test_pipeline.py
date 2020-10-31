@@ -1,6 +1,7 @@
 import json
 import pytest
 import networkx as nx
+import shutil
 
 from datetime import datetime
 from pathlib import Path
@@ -11,7 +12,14 @@ from yenta.pipeline import Pipeline, TaskResult, PipelineResult, InvalidTaskResu
 from yenta.values import Value
 from yenta.artifacts import FileArtifact
 
-settings.YENTA_JSON_STORE_PATH = Path('tests/tmp/pipeline.json')
+
+@pytest.fixture
+def store_path(monkeypatch):
+
+    monkeypatch.setattr(settings, 'YENTA_STORE_PATH', Path('tests/tmp/pipeline'))
+    yield settings.YENTA_STORE_PATH
+    for path in settings.YENTA_STORE_PATH.iterdir():
+        shutil.rmtree(path)
 
 
 def test_pipeline_creation():
@@ -52,10 +60,25 @@ def test_pipeline_with_cycles():
         pipeline = Pipeline(foo, bar, baz)
 
 
-def test_run_pipeline_with_past_results():
+def test_cache_pipeline_result(store_path):
 
-    if settings.YENTA_JSON_STORE_PATH.exists():
-        settings.YENTA_JSON_STORE_PATH.unlink()
+    task_input = TaskResult({'foo': 1}, {'some_file': FileArtifact(location='/some/path')})
+    task_result = TaskResult({'bar': 2}, {'some_other_file': FileArtifact(location='/some/other/path')})
+    previous_result = PipelineResult()
+    previous_result.task_results['previous_task'] = task_input
+
+    pipeline_result = PipelineResult({'this_task': task_result}, {'previous_task': previous_result})
+    pipeline = Pipeline()
+    pipeline.cache_result('this_task', pipeline_result)
+
+    result_file = pipeline.store_path / 'this_task' / 'result.pk'
+    input_file = pipeline.store_path / 'this_task' / 'inputs.pk'
+
+    assert result_file.exists()
+    assert input_file.exists()
+
+
+def test_run_pipeline_with_past_results(store_path):
 
     @task
     def foo(previous_results=None) -> TaskResult:
@@ -81,14 +104,8 @@ def test_run_pipeline_with_past_results():
     sum = result.values('baz', 'sum')
     assert(sum == 3)
 
-    if settings.YENTA_JSON_STORE_PATH.exists():
-        settings.YENTA_JSON_STORE_PATH.unlink()
 
-
-def test_pipeline_run_with_explicit_params():
-
-    if settings.YENTA_JSON_STORE_PATH.exists():
-        settings.YENTA_JSON_STORE_PATH.unlink()
+def test_pipeline_run_with_explicit_params(store_path):
 
     @task
     def foo():
@@ -113,32 +130,23 @@ def test_pipeline_run_with_explicit_params():
     assert (pipeline._tasks_executed == {'foo', 'bar', 'baz'})
     assert (pipeline._tasks_reused == set())
 
-    raw_1 = json.load(open(settings.YENTA_JSON_STORE_PATH, 'r'))
-    t1 = settings.YENTA_JSON_STORE_PATH.stat().st_mtime
+    cache1 = Pipeline.load_pipeline(pipeline.store_path)
 
     result = pipeline.run_pipeline()
     sum = result.values('baz', 'sum')
     assert (sum == 3)
     assert (pipeline._tasks_reused == {'foo', 'bar', 'baz'})
 
-    raw_2 = json.load(open(settings.YENTA_JSON_STORE_PATH, 'r'))
-    t2 = settings.YENTA_JSON_STORE_PATH.stat().st_mtime
+    cache2 = Pipeline.load_pipeline(pipeline.store_path)
 
-    assert(raw_1 == raw_2)
-    assert(t1 != t2)
-
-    if settings.YENTA_JSON_STORE_PATH.exists():
-        settings.YENTA_JSON_STORE_PATH.unlink()
+    assert(cache1 == cache2)
 
 
-def test_pipeline_run_with_artifacts():
+def test_pipeline_run_with_artifacts(store_path):
 
     foo_file = './foo.dat'
     bar_file = './bar.dat'
     baz_file = './baz.dat'
-
-    if settings.YENTA_JSON_STORE_PATH.exists():
-        settings.YENTA_JSON_STORE_PATH.unlink()
 
     @task
     def foo() -> TaskResult:
@@ -184,14 +192,8 @@ def test_pipeline_run_with_artifacts():
     Path(bar_file).unlink()
     Path(baz_file).unlink()
 
-    if settings.YENTA_JSON_STORE_PATH.exists():
-        settings.YENTA_JSON_STORE_PATH.unlink()
 
-
-def test_pipeline_with_non_scalar_values():
-
-    if settings.YENTA_JSON_STORE_PATH.exists():
-        settings.YENTA_JSON_STORE_PATH.unlink()
+def test_pipeline_with_non_scalar_values(store_path):
 
     @task
     def foo() -> TaskResult:
@@ -212,14 +214,8 @@ def test_pipeline_with_non_scalar_values():
     answer = result.values('baz', 'result')
     assert (answer == [1, 2, 3, 4, 5, 6])
 
-    if settings.YENTA_JSON_STORE_PATH.exists():
-        settings.YENTA_JSON_STORE_PATH.unlink()
 
-
-def test_pipeline_run_with_selectors():
-
-    if settings.YENTA_JSON_STORE_PATH.exists():
-        settings.YENTA_JSON_STORE_PATH.unlink()
+def test_pipeline_run_with_selectors(store_path):
 
     @task
     def foo() -> TaskResult:
@@ -245,9 +241,6 @@ def test_pipeline_run_with_selectors():
     result = pipeline.run_pipeline()
     answer = result.values('baz', 'result')
     assert (answer == 21)
-
-    if settings.YENTA_JSON_STORE_PATH.exists():
-        settings.YENTA_JSON_STORE_PATH.unlink()
 
 
 def test_wrap_value():
@@ -276,10 +269,7 @@ def test_wrap_task_output():
            "expected either a dict or a TaskResult" in str(ex.value)
 
 
-def test_non_serializable_result():
-
-    if settings.YENTA_JSON_STORE_PATH.exists():
-        settings.YENTA_JSON_STORE_PATH.unlink()
+def test_non_serializable_result(store_path):
 
     @task
     def foo() -> TaskResult:
@@ -299,7 +289,7 @@ def test_non_serializable_result():
     # we'll have an exception that will prevent baz from running
     result = pipeline.run_pipeline()
 
-    with open(settings.YENTA_JSON_STORE_PATH, 'r') as f:
-        cached_result = json.load(f)
-        assert result == PipelineResult(**cached_result)
-        assert 'baz' not in cached_result
+    cached_result = Pipeline.load_pipeline(pipeline.store_path)
+
+    assert result == cached_result
+    assert 'baz' not in cached_result.task_results

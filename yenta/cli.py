@@ -5,7 +5,7 @@ import click
 import configparser
 import importlib.util
 import more_itertools
-import json
+import shutil
 import os
 
 from networkx.drawing.nx_pydot import to_pydot
@@ -68,10 +68,11 @@ def yenta(config_file, pipeline, entry_point, log_file):
 
 
 @yenta.command(help='List all available tasks.')
-def list_tasks():
+@click.option('--pipeline-name', default='default', help='The name of the pipeline to display.')
+def list_tasks(pipeline_name='default'):
 
     tasks = load_tasks(settings.YENTA_ENTRY_POINT)
-    pipeline_data = Pipeline.load_pipeline()
+    pipeline_data = Pipeline.load_pipeline(settings.YENTA_STORE_PATH / pipeline_name)
 
     print(Fore.WHITE + Style.BRIGHT + 'The following tasks are available:')
     for task in tasks:
@@ -89,25 +90,22 @@ def list_tasks():
 @yenta.command(help='Show the current configuration.')
 def show_config():
 
-    tasks = load_tasks(settings.YENTA_ENTRY_POINT)
-    pipeline = Pipeline(*tasks)
-
     print(Fore.WHITE + Style.BRIGHT + 'Yenta is using the following configuration:')
     print('The entrypoint for Yenta is ' + Fore.GREEN + str(settings.YENTA_ENTRY_POINT) + Fore.WHITE)
-    print('Pipeline will be cached in ' + Fore.GREEN + str(settings.YENTA_JSON_STORE_PATH) + Fore.WHITE)
+    print('Pipelines will be cached in ' + Fore.GREEN + str(settings.YENTA_STORE_PATH) + Fore.WHITE)
     if settings.YENTA_LOG_FILE:
         print('Log output will be written to ' + Fore.GREEN + str(settings.YENTA_LOG_FILE) + Fore.WHITE)
     else:
         print('No log output configured')
-    print('Tasks will be executed in the following order: ' + Fore.GREEN + ', '.join(pipeline.execution_order))
 
 
 @yenta.command(help='Show information about a specific task.')
 @click.argument('task-name')
-def task_info(task_name):
+@click.option('--pipeline-name', default='default', help='The name of the pipeline to display.')
+def task_info(task_name, pipeline_name='default'):
 
     tasks = load_tasks(settings.YENTA_ENTRY_POINT)
-    pipeline_data = Pipeline.load_pipeline()
+    pipeline_data = Pipeline.load_pipeline(settings.YENTA_STORE_PATH / pipeline_name)
     try:
         task = more_itertools.one(filter(lambda t: t.task_def.name == task_name, tasks))
         print(Fore.WHITE + Style.BRIGHT + 'Information for task ' + Fore.GREEN + task_name + Fore.WHITE + ':')
@@ -131,19 +129,15 @@ def task_info(task_name):
 
 @yenta.command(help='Remove a task from the pipeline cache.')
 @click.argument('task-name')
-def rm(task_name):
+@click.option('--pipeline-name', default='default', help='The name of the pipeline to display.')
+def rm(task_name, pipeline_name='default'):
 
-    pipeline_data = Pipeline.load_pipeline()
+    task_path = settings.YENTA_STORE_PATH / pipeline_name / task_name
 
-    if task_name in pipeline_data.task_results:
-        del pipeline_data.task_results[task_name]
+    if task_path.exists():
+        shutil.rmtree(task_path)
     else:
         print(Fore.WHITE + Style.BRIGHT + 'Unknown task ' + Fore.RED + task_name + Fore.WHITE + ' specified.')
-    if task_name in pipeline_data.task_inputs:
-        del pipeline_data.task_inputs[task_name]
-
-    with open(settings.YENTA_JSON_STORE_PATH, 'w') as f:
-        json.dump(asdict(pipeline_data), f, indent=4)
 
 
 @yenta.command(help='Dump the task graph to a DOT file.')
