@@ -9,7 +9,6 @@ from pathlib import Path
 from yenta.config import settings
 from yenta.tasks.Task import task
 from yenta.pipeline import Pipeline, TaskResult, PipelineResult, InvalidTaskResultError
-from yenta.values import Value
 from yenta.artifacts import FileArtifact
 
 
@@ -82,11 +81,11 @@ def test_run_pipeline_with_past_results(store_path):
 
     @task
     def foo(previous_results=None) -> TaskResult:
-        return TaskResult({'x': Value(1)}, {})
+        return TaskResult({'x': 1}, {})
 
     @task
     def bar():
-        return TaskResult({'y': Value(2)}, {})
+        return TaskResult({'y': 2}, {})
 
     @task(depends_on=['foo', 'bar'])
     def baz(previous_results: PipelineResult):
@@ -96,7 +95,7 @@ def test_run_pipeline_with_past_results(store_path):
 
         result = x + y
 
-        return TaskResult({'sum': Value(result)}, {})
+        return TaskResult({'sum': result}, {})
 
     pipeline = Pipeline(foo, bar, baz)
     result = pipeline.run_pipeline()
@@ -109,18 +108,18 @@ def test_pipeline_run_with_explicit_params(store_path):
 
     @task
     def foo():
-        return {'values': {'x': Value(1)}}
+        return {'values': {'x': 1}}
 
     @task
     def bar():
-        return TaskResult({'y': Value(2)}, {})
+        return TaskResult({'y': 2}, {})
 
     @task(depends_on=['foo', 'bar'])
     def baz(x: 'foo__values__x', y: 'bar__values__y'):
 
         result = x + y
 
-        return TaskResult({'sum': Value(result)}, {})
+        return TaskResult({'sum': result}, {})
 
     pipeline = Pipeline(foo, bar, baz)
     result = pipeline.run_pipeline()
@@ -159,7 +158,7 @@ def test_pipeline_run_with_artifacts(store_path):
     def bar():
         with open(bar_file, 'w') as f:
             f.write('bar')
-        return TaskResult({'y': Value(2)},
+        return TaskResult({'y': 2},
                           {'bar_file': FileArtifact(bar_file, str(datetime.now()))})
 
     @task(depends_on=['foo', 'bar'])
@@ -172,7 +171,7 @@ def test_pipeline_run_with_artifacts(store_path):
             bar_data = f.read()
         with open(baz_file, 'w') as f:
             f.write(foo_data + bar_data)
-        return TaskResult({'sum': Value(sum_x_y)},
+        return TaskResult({'sum': sum_x_y},
                           {'baz_file': FileArtifact(baz_file, str(datetime.now()))})
 
     pipeline = Pipeline(foo, bar, baz)
@@ -197,7 +196,7 @@ def test_pipeline_with_non_scalar_values(store_path):
 
     @task
     def foo() -> TaskResult:
-        return TaskResult({'x': Value([1, 2, 3])})
+        return TaskResult({'x': [1, 2, 3]})
 
     @task
     def bar():
@@ -206,7 +205,7 @@ def test_pipeline_with_non_scalar_values(store_path):
     @task(depends_on=['foo', 'bar'])
     def baz(x: 'foo__values__x', y: 'bar__values__y'):
         sum_x_y = x + y
-        return TaskResult({'result': Value(sum_x_y)})
+        return TaskResult({'result': sum_x_y})
 
     pipeline = Pipeline(foo, bar, baz)
 
@@ -219,7 +218,7 @@ def test_pipeline_run_with_selectors(store_path):
 
     @task
     def foo() -> TaskResult:
-        return TaskResult({'x': Value([1, 2, 3])})
+        return TaskResult({'x': [1, 2, 3]})
 
     @task
     def bar():
@@ -234,26 +233,13 @@ def test_pipeline_run_with_selectors(store_path):
     @task(depends_on=['foo', 'bar'], selectors={'x': foo_x_selector, 'y': bar_y_selector})
     def baz(x, y):
         sum_x_y = x + y
-        return TaskResult({'result': Value(sum_x_y)})
+        return TaskResult({'result': sum_x_y})
 
     pipeline = Pipeline(foo, bar, baz)
 
     result = pipeline.run_pipeline()
     answer = result.values('baz', 'result')
     assert (answer == 21)
-
-
-def test_wrap_value():
-
-    v = Value(1)
-    assert v == TaskResult._wrap_as_value(v)
-    assert v == TaskResult._wrap_as_value({'value': 1})
-    assert v == TaskResult._wrap_as_value(1)
-
-    with pytest.raises(ValueError) as ex:
-        TaskResult._wrap_as_value({1})
-
-    assert f'Can not wrap {set([1])} in a Value'
 
 
 def test_wrap_task_output():

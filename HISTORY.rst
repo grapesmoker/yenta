@@ -37,3 +37,10 @@ History
 * If an exception is raised during task execution, the stack trace is printed
 * pydot is now used for graph generation
 * Artifact equality is checked by comparing location and hash
+
+0.3.0 (2020-10-31)
+------------------
+
+* Serialization scheme moved from JSON to pickle to improve performance.
+* "Values" no longer explicitly exist; anything that can be pickled is a valid value.
+* Multiple pipelines with different names can be used in the same project.

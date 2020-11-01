@@ -18,7 +18,6 @@ from more_itertools import split_after
 from yenta.artifacts.Artifact import Artifact
 from yenta.config import settings
 from yenta.tasks.Task import TaskDef, ParameterType, ResultSpec
-from yenta.values.Value import Value
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +40,7 @@ class TaskStatus(str, Enum):
 class TaskResult:
     """ Holds the result of a specific task execution """
 
-    values: Dict[str, Union[Value, List, str, int, float, bool]] = field(default_factory=dict)
+    values: Dict[str, Any] = field(default_factory=dict)
     """ A dictionary whose keys are value names and whose values are... values."""
 
     artifacts: Dict[str, Artifact] = field(default_factory=dict)
@@ -52,35 +51,6 @@ class TaskResult:
 
     error: str = None
     """ Error message associated with task failure."""
-
-    @staticmethod
-    def _wrap_as_value(v: Union[Value, dict, str, int, float, bool, list]) -> Value:
-        """
-        Wraps a value resulting from a task execution in a Value.
-        :param v: the value to be wrapped
-        :return: Value(v)
-        """
-        if isinstance(v, Value):
-            return v
-        elif isinstance(v, dict):
-            return Value(**v)
-        elif isinstance(v, str) or isinstance(v, int) or isinstance(v, float) or isinstance(v, bool) or \
-                isinstance(v, list) or v is None:
-            return Value(v)
-        else:
-            raise ValueError(f'Can not wrap {v} in a Value')
-
-    def __post_init__(self):
-        """
-        Deserialize nested values and artifacts into Value and Artifact objects
-        :return:
-        """
-
-        values = {k: self._wrap_as_value(v) for k, v in self.values.items() if not isinstance(v, Value)}
-        artifacts = {k: Artifact(**v) for k, v in self.artifacts.items() if not isinstance(v, Artifact)}
-
-        self.values.update(values)
-        self.artifacts.update(artifacts)
 
 
 @dataclass
@@ -94,18 +64,6 @@ class PipelineResult:
     task_inputs: Dict[str, 'PipelineResult'] = field(default_factory=dict)
     """ A dictionary whose keys are task names and whose values are the inputs used in executing that task."""
 
-    def __post_init__(self):
-        """
-        Deserialize subcomponents of the PipelineResult into task results and task inputs
-        :return: None
-        """
-
-        task_results = {k: TaskResult(**v) for k, v in self.task_results.items() if not isinstance(v, TaskResult)}
-        task_inputs = {k: PipelineResult(**v) for k, v in self.task_inputs.items() if not isinstance(v, PipelineResult)}
-
-        self.task_results.update(task_results)
-        self.task_inputs.update(task_inputs)
-
     def values(self, task_name: str, value_name: str):
         """ Return the value named `value_name` that was produced by task `task_name`.
 
@@ -114,7 +72,7 @@ class PipelineResult:
         :return: the unwrapped value produced by the task
         :rtype: Union[list, int, bool, float, str]
         """
-        return self.task_results[task_name].values[value_name].value
+        return self.task_results[task_name].values[value_name]
 
     def artifacts(self, task_name: str, artifact_name: str):
         """ Return the artifact names `artifact_name` that was produced by the task `task_name`.

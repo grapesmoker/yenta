@@ -9,7 +9,6 @@ import shutil
 import os
 
 from networkx.drawing.nx_pydot import to_pydot
-from dataclasses import asdict
 from colorama import init, Fore, Style
 from pathlib import Path
 from yenta.config import settings
@@ -35,10 +34,10 @@ def load_tasks(entry_file):
 @click.group()
 @click.option('--config-file', default=settings.YENTA_CONFIG_FILE, type=Path,
               help='The config file from which to read settings.')
-@click.option('--pipeline', type=Path, help='The file to which the pipeline will be cached.')
+@click.option('--pipeline-store', type=Path, help='The directory to which the pipeline will be cached.')
 @click.option('--entry-point', type=Path, help='The file containing the task definitions.')
 @click.option('--log-file', type=Path, help='The file to which the logs should be written.')
-def yenta(config_file, pipeline, entry_point, log_file):
+def yenta(config_file, pipeline_store, entry_point, log_file):
 
     init()
 
@@ -57,9 +56,9 @@ def yenta(config_file, pipeline, entry_point, log_file):
 
     pipeline_file = cf['yenta'].get('pipeline_store', None)
     pipeline_path = Path(pipeline_file).resolve() if pipeline_file else None
-    settings.YENTA_JSON_STORE_PATH = pipeline or \
-                                     pipeline_path or \
-                                     settings.YENTA_JSON_STORE_PATH
+    settings.YENTA_STORE_PATH = pipeline_store or \
+                                pipeline_path or \
+                                settings.YENTA_STORE_PATH
     conf_log_file = cf['yenta'].get('log_file', None)
     conf_log_path = Path(conf_log_file).resolve() if log_file else None
     settings.YENTA_LOG_FILE = log_file or \
@@ -153,11 +152,12 @@ def dump_task_graph(filename: Path):
 @yenta.command(help='Run the pipeline.')
 @click.option('--up-to', help='Optionally run the pipeline up to and including a given task.')
 @click.option('--force-rerun', '-f', multiple=True, default=[], help='Force specified tasks to rerun.')
-def run(up_to=None, force_rerun=None):
+@click.option('--pipeline-name', default='default', help='The name of the pipeline to run.')
+def run(up_to=None, force_rerun=None, pipeline_name='default'):
 
     logger.info('Running the pipeline')
     tasks = load_tasks(settings.YENTA_ENTRY_POINT)
-    pipeline = Pipeline(*tasks)
+    pipeline = Pipeline(*tasks, name=pipeline_name)
     result = pipeline.run_pipeline(up_to, force_rerun)
 
 

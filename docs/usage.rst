@@ -21,7 +21,7 @@ It is straightforward to use Yenta as a library.
 
     @task
     def bar():
-        return {'values': {'y': Value(2)}, 'artifacts': {}}
+        return {'values': {'y': 2}, 'artifacts': {}}
 
     @task(depends_on['foo', 'bar'])
     def baz(u: 'foo__values__x', v: 'bar__values__y'):
@@ -116,7 +116,7 @@ passing them as arguments to the downstream task. To see how this is accomplishe
 
     @task
     def foo() -> TaskResult:
-        return TaskResult({'x': Value([1, 2, 3])})
+        return TaskResult({'x': [1, 2, 3]})
 
     @task
     def bar():
@@ -131,7 +131,7 @@ passing them as arguments to the downstream task. To see how this is accomplishe
     @task(depends_on=['foo', 'bar'], selectors={'x': foo_x_selector, 'y': bar_y_selector})
     def baz(x, y):
         sum_x_y = x + y
-        return TaskResult({'sum': Value(sum_x_y)})
+        return TaskResult({'sum': sum_x_y})
 
     pipeline = Pipeline(foo, bar, baz)
     result = pipeline.run()
@@ -156,32 +156,30 @@ they extract.
 Return Values
 +++++++++++++
 
-Tasks can return their results in three ways, all of which are shown above. The first way is as a simple dictionary
+Tasks can return their results in two ways, both of which are shown above. The first way is as a simple dictionary
 whose keys are the names of the returned values, and whose values are... the values. Each value must have its own
-name in the result set. A second way of returning values is to wrap them in a :class:`~yenta.values.Value`; this is done
-internally anyway for serialization purposes. A third way is to return the task result directly via a
-:class:`~yenta.pipeline.Pipeline.TaskResult` object. In general, the third way is preferable since it is the most
-explicit; however, under the hood, Yenta transforms all three formats into
+name in the result set. A second way is to return the task result directly via a
+:class:`~yenta.pipeline.Pipeline.TaskResult` object. In general, the second way is preferable since it is the most
+explicit; however, under the hood, Yenta transforms the first format into
 :class:`~yenta.pipeline.Pipeline.TaskResult` anyway.
 
-The results of a Yenta task come in two flavors: Values and Artifacts. A Value is any basic Python value that is
-computed during the execution of the task and should be returned to the pipeline. Any JSON-serializable Python object
-can be a Value. Artifacts represent any modifications to external stores that might be created by the task; an example
+The results of a Yenta task come in two flavors: values and Artifacts. A value is any basic Python value that is
+computed during the execution of the task and should be returned to the pipeline. Any Python object that can be pickled
+can be a value. Artifacts represent any modifications to external stores that might be created by the task; an example
 (currently the only example) of an Artifact is the :class:`~yenta.artifacts.Artifact.FileArtifact`, which represents an
 external file generated during the task execution.
 
 .. warning::
 
-    Values returned to Yenta `must` be JSON-serializable, as that is how they are written to disk in the representation
-    of the pipeline. That means that any of the types :code:`str, bool, int`, and :code:`float` are allowed, as are
-    :code:`list`, :code:`tuple`, and :code:`dict`, provided their contents are also JSON-serializable.
+    Values must be picklable by Python. The usual caveats about unpickling untrusted code apply. In the previous
+    version of Yenta, you could only use JSON-serializable values, but that restriction has been lifted.
 
 
 Caching TaskResults and "Functional" Pipelines
 ++++++++++++++++++++++++++++++++++++++++++++++
 
 The first time that Yenta runs, it will execute every task and, assuming task execution succeeds, serialize the
-results to the file indicated by :data:`~yenta.config.settings.YENTA_JSON_STORE_PATH`. If you run the pipeline
+results to the directory indicated by :data:`~yenta.config.settings.YENTA_STORE_PATH`. If you run the pipeline
 a second time, the graphical output will show a yellow bar next to the task names, indicating that the previous
 results of the run have been reused. This is a key feature of Yenta.
 
@@ -196,6 +194,15 @@ Obviously, some tasks will not fit this paradigm. One example is any task that r
 care is taken to explicitly reuse the same seed each time the task is run. Another issue where you might need to take
 extra care is floating point computations, which, depending on the precise software doing the math and configuration
 thereof may not be deterministically rounded the same way each time.
+
+Named Pipelines
++++++++++++++++
+
+As of version 0.3.0, Yenta supports the use of multiple pipelines in a single project, which can be distinguished by
+their :code:`name` parameter, specified at creation, e.g. :code:`pipeline = Pipeline(*tasks, name='my_pipeline')`.
+If you use a single pipeline, by default it will have the name `default`, but you can use as many pipelines as you
+like and they will all operate independently of each other. Task dependency between pipelines is not currently
+supported.
 
 Command Line Usage
 ------------------
