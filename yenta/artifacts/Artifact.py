@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from yenta.utils.files import file_hash
 
@@ -9,7 +9,7 @@ from yenta.utils.files import file_hash
 @dataclass
 class Artifact:
 
-    location: str
+    location: Union[str, Path]
     date_created: str = None
     hash: Optional[str] = None
     meta: dict = None

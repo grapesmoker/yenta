@@ -108,3 +108,6 @@ ENV/
 # test junk
 tests/tmp/*
 tests/sample_pipelines/*.json
+
+# pipeline cache
+.yenta_cache/*

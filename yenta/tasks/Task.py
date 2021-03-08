@@ -61,6 +61,8 @@ def build_parameter_spec(func, selectors: Dict[str, Callable] = None):
     #   parameter and produces an arbitrary value
     # note the double underbars like in the django query language
 
+    # TODO: fix bug where a single parameter cannot be underbar-referenced
+
     err_format = '<task_name>__<values|artifacts>__<value_name|artifact_name>'
 
     if len(param_names) == 0:

@@ -224,7 +224,7 @@ class Pipeline:
 
         task_cache = task_path / 'inputs.pk'
         with open(task_cache, 'wb') as f:
-            pickle.dump(result.task_inputs, f)
+            pickle.dump(result.task_inputs[task_name], f)
 
     @staticmethod
     def load_pipeline(store_path: Path) -> PipelineResult:
@@ -243,7 +243,7 @@ class Pipeline:
                         inputs = pickle.load(f)
                     with open(task_path / 'result.pk', 'rb') as f:
                         result = pickle.load(f)
-                    pipeline.task_inputs.update(inputs)
+                    pipeline.task_inputs[task_name] = inputs
                     pipeline.task_results[task_name] = result
 
         return pipeline
