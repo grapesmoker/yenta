@@ -81,17 +81,17 @@ def list_tasks(pipeline_name='default'):
     tasks = load_tasks(settings.YENTA_ENTRY_POINT)
     pipeline_data = Pipeline.load_pipeline(settings.YENTA_STORE_PATH / pipeline_name)
 
-    print(Fore.WHITE + Style.BRIGHT + 'The following tasks are available:')
+    print('[bold white]The following tasks are available:[/bold white]')
     for task in tasks:
         task_name = task.task_def.name
         task_result = pipeline_data.task_results.get(task_name, None)
         marker = ' '
         if task_result and task_result.status == TaskStatus.SUCCESS:
-            marker = Fore.GREEN + u'\u2714' + Fore.WHITE
+            marker = f'[bold green]{CHECK_MARK}[/bold green]'
         elif task_result and task_result.status == TaskStatus.FAILURE:
-            marker = Fore.RED + u'\u2718' + Fore.WHITE
+            marker = f'[bold red]{X_MARK}[/bold red]'
 
-        print(Fore.WHITE + Style.BRIGHT + f'[{marker}] {task_name}')
+        print(f'[{marker}] [bold white]{task_name}[/bold white]')
 
 
 @yenta.command(help='Show the current configuration.')
