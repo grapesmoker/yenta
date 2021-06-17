@@ -30,6 +30,10 @@ class InvalidParameterError(Exception):
     pass
 
 
+class PipelineConfigError(Exception):
+    pass
+
+
 class TaskStatus(str, Enum):
 
     SUCCESS = 'success'
@@ -281,7 +285,10 @@ class Pipeline:
 
         for task_name in list(split_after(self.execution_order, lambda x: x == up_to))[0]:
             logger.debug(f'Starting executions of {task_name}')
-            task = self.task_graph.nodes[task_name]['task']
+            task_node = self.task_graph.nodes.get(task_name, None)
+            if not task_node:
+                raise PipelineConfigError(f'Dependency on nonexistent task: {task_name}')
+            task = task_node['task']
             args = PipelineResult()
             dependencies_succeeded = True
             for dependency in (task.task_def.depends_on or []):

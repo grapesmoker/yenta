@@ -97,9 +97,9 @@ def list_tasks(pipeline_name='default'):
 @yenta.command(help='Show the current configuration.')
 def show_config():
 
-    print(Fore.WHITE + Style.BRIGHT + 'Yenta is using the following configuration:')
-    print('The entrypoint for Yenta is ' + Fore.GREEN + str(settings.YENTA_ENTRY_POINT) + Fore.WHITE)
-    print('Pipelines will be cached in ' + Fore.GREEN + str(settings.YENTA_STORE_PATH) + Fore.WHITE)
+    print('[bold white]Yenta is using the following configuration:[/bold white]')
+    print(f'[bold white]The entrypoint for Yenta is [green]{settings.YENTA_ENTRY_POINT}[/green][/bold white]')
+    print(f'[bold white]Pipelines will be cached in [green]{settings.YENTA_STORE_PATH}[/green][/bold white]')
     if settings.YENTA_LOG_FILE:
         print('Log output will be written to ' + Fore.GREEN + str(settings.YENTA_LOG_FILE) + Fore.WHITE)
     else:
