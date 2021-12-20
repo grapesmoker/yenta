@@ -135,7 +135,7 @@ def task_info(task_name, pipeline_name='default'):
                 if isinstance(val, Iterable) and not isinstance(val, str):
                     key_node = values_node.add(Text(f'{key}: '))
                     for v in val:
-                        key_node.add(Text(v))
+                        key_node.add(Text(str(v)))
                 else:
                     values_node.add(Text(f'{key}: {val}'))
             artifacts_node = tree.add('artifacts')
