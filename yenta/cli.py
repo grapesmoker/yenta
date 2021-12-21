@@ -83,8 +83,7 @@ def list_tasks(pipeline_name='default'):
     pipeline_data = Pipeline.load_pipeline(settings.YENTA_STORE_PATH / pipeline_name)
 
     print('[bold white]The following tasks are available:[/bold white]')
-    for task in pipeline.execution_order:
-        task_name = task.task_def.name
+    for task_name in pipeline.execution_order:
         task_result = pipeline_data.task_results.get(task_name, None)
         marker = ' '
         if task_result and task_result.status == TaskStatus.SUCCESS:
