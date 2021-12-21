@@ -79,10 +79,11 @@ def yenta(config_file, pipeline_store, entry_point, log_file):
 def list_tasks(pipeline_name='default'):
 
     tasks = load_tasks(settings.YENTA_ENTRY_POINT)
+    pipeline = Pipeline(*tasks)
     pipeline_data = Pipeline.load_pipeline(settings.YENTA_STORE_PATH / pipeline_name)
 
     print('[bold white]The following tasks are available:[/bold white]')
-    for task in tasks:
+    for task in pipeline.execution_order:
         task_name = task.task_def.name
         task_result = pipeline_data.task_results.get(task_name, None)
         marker = ' '
