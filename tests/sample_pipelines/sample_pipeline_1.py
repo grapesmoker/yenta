@@ -16,6 +16,6 @@ def bar():
 
 
 @task(depends_on=['foo', 'bar'])
-def baz():
+def baz(foo_result, bar_result):
     print('hello from baz task')
     return TaskResult({'result': 1})

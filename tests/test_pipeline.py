@@ -24,7 +24,7 @@ def store_path(monkeypatch):
 def test_pipeline_creation():
 
     @task
-    def foo(previous_results=None):
+    def foo():
         pass
 
     @task
@@ -32,7 +32,7 @@ def test_pipeline_creation():
         pass
 
     @task(depends_on=['foo', 'bar'])
-    def baz(previous_results):
+    def baz(foo_result, bar_result):
         pass
 
     pipeline = Pipeline(foo, bar, baz)
@@ -44,15 +44,15 @@ def test_pipeline_creation():
 def test_pipeline_with_cycles():
 
     @task(depends_on=['baz'])
-    def foo(previous_results=None):
+    def foo(baz_result):
         pass
 
     @task(depends_on=['foo'])
-    def bar():
+    def bar(foo_result):
         pass
 
     @task(depends_on=['bar'])
-    def baz(previous_results):
+    def baz(bar_result):
         pass
 
     with pytest.raises(nx.NetworkXUnfeasible):
@@ -61,12 +61,15 @@ def test_pipeline_with_cycles():
 
 def test_cache_pipeline_result(store_path):
 
-    task_input = TaskResult({'foo': 1}, {'some_file': FileArtifact(location='/some/path')})
-    task_result = TaskResult({'bar': 2}, {'some_other_file': FileArtifact(location='/some/other/path')})
+    task_input = TaskResult({'foo': 1, 'some_file': FileArtifact(location='/some/path')})
+    task_result = TaskResult({'bar': 2, 'some_other_file': FileArtifact(location='/some/other/path')})
     previous_result = PipelineResult()
     previous_result.task_results['previous_task'] = task_input
+    previous_result.task_inputs['this_task'] = task_input
 
-    pipeline_result = PipelineResult({'this_task': task_result}, {'previous_task': previous_result})
+    pipeline_result = PipelineResult({'this_task': task_result},
+                                     {'previous_task': previous_result,
+                                      'this_task': previous_result})
     pipeline = Pipeline()
     pipeline.cache_result('this_task', pipeline_result)
 
@@ -76,22 +79,22 @@ def test_cache_pipeline_result(store_path):
     assert result_file.exists()
     assert input_file.exists()
 
+    result_file.unlink()
+    input_file.unlink()
+
 
 def test_run_pipeline_with_past_results(store_path):
 
     @task
-    def foo(previous_results=None) -> TaskResult:
+    def foo() -> TaskResult:
         return TaskResult({'x': 1}, {})
 
     @task
     def bar():
         return TaskResult({'y': 2}, {})
 
-    @task(depends_on=['foo', 'bar'])
-    def baz(previous_results: PipelineResult):
-
-        x = previous_results.values('foo', 'x')
-        y = previous_results.values('bar', 'y')
+    @task(depends_on=['foo.x', 'bar.y'])
+    def baz(x, y):
 
         result = x + y
 
@@ -114,8 +117,8 @@ def test_pipeline_run_with_explicit_params(store_path):
     def bar():
         return TaskResult({'y': 2}, {})
 
-    @task(depends_on=['foo', 'bar'])
-    def baz(x: 'foo__values__x', y: 'bar__values__y'):
+    @task(depends_on=['foo.x', 'bar.y'])
+    def baz(x, y):
 
         result = x + y
 
@@ -151,19 +154,18 @@ def test_pipeline_run_with_artifacts(store_path):
     def foo() -> TaskResult:
         with open(foo_file, 'w') as f:
             f.write('foo')
-        return TaskResult({'x': 1},
-                          {'foo_file': FileArtifact(foo_file, str(datetime.now()))})
+        return TaskResult({'x': 1,
+                           'foo_file': FileArtifact(foo_file, str(datetime.now()))})
 
     @task
     def bar():
         with open(bar_file, 'w') as f:
             f.write('bar')
-        return TaskResult({'y': 2},
-                          {'bar_file': FileArtifact(bar_file, str(datetime.now()))})
+        return TaskResult({'y': 2,
+                           'bar_file': FileArtifact(bar_file, str(datetime.now()))})
 
-    @task(depends_on=['foo', 'bar'])
-    def baz(x: 'foo__values__x', y: 'bar__values__y',
-            foo_artifact: 'foo__artifacts__foo_file', bar_artifact: 'bar__artifacts__bar_file'):
+    @task(depends_on=['foo.x', 'foo.foo_file', 'bar.y', 'bar.bar_file'])
+    def baz(x, foo_artifact, y, bar_artifact):
         sum_x_y = x + y
         with open(foo_artifact.location, 'r') as f:
             foo_data = f.read()
@@ -171,8 +173,8 @@ def test_pipeline_run_with_artifacts(store_path):
             bar_data = f.read()
         with open(baz_file, 'w') as f:
             f.write(foo_data + bar_data)
-        return TaskResult({'sum': sum_x_y},
-                          {'baz_file': FileArtifact(baz_file, str(datetime.now()))})
+        return TaskResult({'sum': sum_x_y,
+                           'baz_file': FileArtifact(baz_file, str(datetime.now()))})
 
     pipeline = Pipeline(foo, bar, baz)
 
@@ -180,7 +182,7 @@ def test_pipeline_run_with_artifacts(store_path):
     sum = result.values('baz', 'sum')
     assert (sum == 3)
 
-    baz_artifact: FileArtifact = result.artifacts('baz', 'baz_file')
+    baz_artifact: FileArtifact = result.values('baz', 'baz_file')
 
     with open(baz_artifact.location, 'r') as f:
         baz_data = f.read()
@@ -202,8 +204,8 @@ def test_pipeline_with_non_scalar_values(store_path):
     def bar():
         return TaskResult({'y': [4, 5, 6]})
 
-    @task(depends_on=['foo', 'bar'])
-    def baz(x: 'foo__values__x', y: 'bar__values__y'):
+    @task(depends_on=['foo.x', 'bar.y'])
+    def baz(x, y):
         sum_x_y = x + y
         return TaskResult({'result': sum_x_y})
 
@@ -214,37 +216,9 @@ def test_pipeline_with_non_scalar_values(store_path):
     assert (answer == [1, 2, 3, 4, 5, 6])
 
 
-def test_pipeline_run_with_selectors(store_path):
-
-    @task
-    def foo() -> TaskResult:
-        return TaskResult({'x': [1, 2, 3]})
-
-    @task
-    def bar():
-        return TaskResult({'y': [4, 5, 6]})
-
-    def foo_x_selector(result: PipelineResult):
-        return sum(result.values('foo', 'x'))
-
-    def bar_y_selector(result: PipelineResult):
-        return sum(result.values('bar', 'y'))
-
-    @task(depends_on=['foo', 'bar'], selectors={'x': foo_x_selector, 'y': bar_y_selector})
-    def baz(x, y):
-        sum_x_y = x + y
-        return TaskResult({'result': sum_x_y})
-
-    pipeline = Pipeline(foo, bar, baz)
-
-    result = pipeline.run_pipeline()
-    answer = result.values('baz', 'result')
-    assert (answer == 21)
-
-
 def test_wrap_task_output():
 
-    t = TaskResult(values={'v': 1}, artifacts={})
+    t = TaskResult(values={'v': 1})
     assert t == Pipeline._wrap_task_output({'values': {'v': 1}}, 'task_name')
     assert t == Pipeline._wrap_task_output(t, 'task_name')
 
@@ -263,11 +237,11 @@ def test_non_serializable_result(store_path):
 
     # a task with a non-serializable result
     @task(depends_on=['foo'])
-    def bar():
+    def bar(foo_result):
         return TaskResult({'y': Path('abc')})
 
     @task(depends_on=['bar'])
-    def baz():
+    def baz(bar_result):
         return TaskResult({'z': 2})
 
     pipeline = Pipeline(foo, bar)

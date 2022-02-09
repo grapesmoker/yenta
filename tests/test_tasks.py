@@ -8,36 +8,26 @@ from yenta.tasks import (
 
 def test_build_param_spec():
 
-    @task
-    def foo(previous_results):
+    @task(depends_on=['bar'])
+    def foo(bar_result):
         pass
 
-    spec = build_parameter_spec(foo)
-    expected_spec = [ParameterSpec('previous_results', ParameterType.PIPELINE_RESULTS)]
+    spec = build_parameter_spec(foo, ['bar'])
+    expected_spec = [ParameterSpec('bar_result',
+                                   ParameterType.PIPELINE_RESULTS,
+                                   result_spec=ResultSpec(result_task_name='bar'))]
 
     assert(spec == expected_spec)
 
     @task
-    def bar(x: 'foo__values__x', y: 'foo__artifacts__y'):
+    def bar(x, y):
         pass
 
-    spec = build_parameter_spec(bar)
+    spec = build_parameter_spec(bar, ['foo.x', 'foo.y'])
     expected_spec = [
-        ParameterSpec('x', ParameterType.EXPLICIT, ResultSpec('foo', ResultType.VALUE, 'x')),
-        ParameterSpec('y', ParameterType.EXPLICIT, ResultSpec('foo', ResultType.ARTIFACT, 'y'))
+        ParameterSpec('x', ParameterType.EXPLICIT, ResultSpec('foo', 'x')),
+        ParameterSpec('y', ParameterType.EXPLICIT, ResultSpec('foo', 'y'))
     ]
-
-    assert(spec == expected_spec)
-
-    selector = lambda res: res
-    selectors = {'x': selector}
-
-    @task(selectors={'x': selector})
-    def baz(x):
-        pass
-
-    spec = build_parameter_spec(baz, selectors)
-    expected_spec = [ParameterSpec('x', ParameterType.EXPLICIT, None, selector)]
 
     assert(spec == expected_spec)
 
@@ -47,22 +37,12 @@ def test_invalid_param_spec():
     with pytest.raises(InvalidTaskDefinitionError) as ex:
 
         @task
-        def foo(x: 'bar__values__x', y: int):
+        def foo(x, y):
             pass
 
-        _ = build_parameter_spec(foo)
+        _ = build_parameter_spec(foo, depends_on=['bar.x', 'bar.y', 'bar.z'])
 
-    assert('Annotation string or selector missing' in str(ex.value))
-
-    with pytest.raises(InvalidTaskDefinitionError) as ex:
-
-        @task
-        def foo(x: 'bar__values__x', y: 'bad_annotation'):
-            pass
-
-        _ = build_parameter_spec(foo)
-
-    assert ('Invalid function annotation' in str(ex.value))
+    assert('Insufficient number of parameters' in str(ex.value))
 
 
 def test_task_definition():
@@ -71,7 +51,7 @@ def test_task_definition():
     def foo(previous_results):
         pass
 
-    expected_def = TaskDef('foo', None, True, [ParameterSpec('previous_results', ParameterType.PIPELINE_RESULTS)])
+    expected_def = TaskDef('foo', [], True, [])
 
     assert(foo.task_def == expected_def)
 

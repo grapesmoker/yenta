@@ -47,9 +47,6 @@ class TaskResult:
     values: Dict[str, Any] = field(default_factory=dict)
     """ A dictionary whose keys are value names and whose values are... values."""
 
-    artifacts: Dict[str, Artifact] = field(default_factory=dict)
-    """ A dictionary whose keys are artifact names and whose values are Artifacts."""
-
     status: TaskStatus = None
     """ Whether the task succeeded or failed."""
 
@@ -129,6 +126,7 @@ class Pipeline:
         for task in self._tasks:
             self.task_graph.add_node(task.task_def.name, task=task)
             for dependency in (task.task_def.depends_on or []):
+                dependency = dependency.split('.')[0]
                 self.task_graph.add_edge(dependency, task.task_def.name)
 
         logger.debug('Computing execution order')
@@ -165,8 +163,8 @@ class Pipeline:
         :param task: The task itself, which has a `task_def` attached to it.
         :param PipelineResult args: The results of the pipeline up to this point
         :return: A dictionary whose keys correspond to the arguments expected by
-                the task to be executed, and whose values are the values to be
-                passed in.
+                 the task to be executed, and whose values are the values to be
+                 passed in.
         :rtype: Dict[str, Any]
         """
 
@@ -178,10 +176,8 @@ class Pipeline:
             if spec.param_type == ParameterType.PIPELINE_RESULTS:
                 args_dict[spec.param_name] = args
             elif spec.param_type == ParameterType.EXPLICIT:
-                if spec.selector:
-                    args_dict[spec.param_name] = spec.selector(args)
-                elif spec.result_spec:
-                    args_dict[spec.param_name] = args.from_spec(spec.result_spec)
+                args_dict[spec.param_name] = args.values(spec.result_spec.result_task_name,
+                                                         spec.result_spec.result_var_name)
 
         return args_dict
 
@@ -215,7 +211,7 @@ class Pipeline:
     def cache_result(self, task_name: str, result: PipelineResult):
         """ Write the pipeline results to a file.
 
-        :param Path task_name: The name of the task to cache.
+        :param str task_name: The name of the task to cache.
         :param PipelineResult result: The results.
         :return: None
         """
@@ -292,6 +288,7 @@ class Pipeline:
             args = PipelineResult()
             dependencies_succeeded = True
             for dependency in (task.task_def.depends_on or []):
+                dependency = dependency.split('.')[0]
                 args.task_results[dependency] = result.task_results[dependency]
                 if result.task_results[dependency].status == TaskStatus.FAILURE:
                     dependencies_succeeded = False

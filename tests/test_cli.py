@@ -16,22 +16,6 @@ from yenta.config import settings
 
 
 @pytest.fixture
-def response():
-    """Sample pytest fixture.
-
-    See more at: http://doc.pytest.org/en/latest/fixture.html
-    """
-    # import requests
-    # return requests.get('https://github.com/audreyr/cookiecutter-pypackage')
-
-
-def test_content(response):
-    """Sample pytest test function with the pytest fixture as an argument."""
-    # from bs4 import BeautifulSoup
-    # assert 'GitHub' in BeautifulSoup(response.content).title.string
-
-
-@pytest.fixture
 def store_path(monkeypatch):
 
     monkeypatch.setattr(settings, 'YENTA_STORE_PATH', Path('tests/tmp/pipeline'))
@@ -52,24 +36,24 @@ def test_command_line_interface():
 def test_list_tasks(store_path):
 
     runner = CliRunner()
-    entry_point = 'tests/sample_pipelines/sample_pipeline_1.py'
+    entry_point = 'sample_pipelines/sample_pipeline_1.py'
 
-    result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline', store_path, 'list-tasks'])
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline-store', store_path, 'list-tasks'])
 
     output_lines = result.output.split('\n')
     assert result.exit_code == 0
     assert output_lines[0] == 'The following tasks are available:'
-    assert output_lines[1] == '[ ] foo'
-    assert output_lines[2] == '[ ] bar'
+    assert output_lines[1] == '[ ] bar'
+    assert output_lines[2] == '[ ] foo'
     assert output_lines[3] == '[ ] baz'
 
 
 def test_run_tasks(store_path):
 
     runner = CliRunner()
-    entry_point = 'tests/sample_pipelines/sample_pipeline_1.py'
+    entry_point = 'sample_pipelines/sample_pipeline_1.py'
 
-    result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline', store_path, 'run'])
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline-store', store_path, 'run'])
 
     assert result.exit_code == 0
 
@@ -80,7 +64,7 @@ def test_run_tasks(store_path):
     assert output_lines[ind + 1] == 'hello from foo task'
     assert output_lines[ind + 2] == '[\u2714] foo'
 
-    result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline', store_path, 'run'])
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline-store', store_path, 'run'])
 
     # bar still errors, foo recycles the old value, baz still not called
     output_lines = result.output.split('\n')
@@ -88,21 +72,21 @@ def test_run_tasks(store_path):
     assert ind >= 0
     assert output_lines[ind + 1] == '[\u2014] foo'
 
-    result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline', store_path, 'list-tasks'])
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline-store', store_path, 'list-tasks'])
 
     output_lines = result.output.split('\n')
     ind = output_lines.index('The following tasks are available:')
-    assert output_lines[ind + 1] == '[\u2714] foo'
-    assert output_lines[ind + 2] == '[\u2718] bar'
+    assert output_lines[ind + 1] == '[\u2718] bar'
+    assert output_lines[ind + 2] == '[\u2714] foo'
     assert output_lines[ind + 3] == '[ ] baz'
 
 
 def test_show_config(store_path):
 
     runner = CliRunner()
-    entry_point = 'tests/sample_pipelines/sample_pipeline_1.py'
+    entry_point = 'sample_pipelines/sample_pipeline_1.py'
 
-    result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline', store_path, 'show-config'])
+    result = runner.invoke(cli.yenta, ['--entry-point', entry_point, '--pipeline-store', store_path, 'show-config'])
 
     output_lines = result.output.split('\n')
     assert output_lines[0] == 'Yenta is using the following configuration:'
@@ -115,24 +99,24 @@ def test_show_config(store_path):
 def test_task_info(store_path):
 
     runner = CliRunner()
-    entry_point = 'tests/sample_pipelines/sample_pipeline_1.py'
+    entry_point = 'sample_pipelines/sample_pipeline_1.py'
 
     result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
-                                       '--pipeline', store_path,
+                                       '--pipeline-store', store_path,
                                        'task-info', 'nonexistent-task'])
 
     assert result.exit_code == 0
     assert result.output == 'Unknown task nonexistent-task specified.\n'
 
     result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
-                                       '--pipeline', store_path,
+                                       '--pipeline-store', store_path,
                                        'run'])
 
     assert result.exit_code == 0
     assert Path(store_path / 'default').exists()
 
     result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
-                                       '--pipeline', store_path,
+                                       '--pipeline-store', store_path,
                                        'task-info', 'foo'])
 
     output_lines = result.output.split('\n')
@@ -141,7 +125,7 @@ def test_task_info(store_path):
     assert output_lines[2] == 'Previous status: \u2714'
 
     result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
-                                       '--pipeline', store_path,
+                                       '--pipeline-store', store_path,
                                        'task-info', 'bar'])
 
     output_lines = result.output.split('\n')
@@ -150,7 +134,7 @@ def test_task_info(store_path):
     assert output_lines[2] == 'Previous status: \u2718 oh noes'
 
     result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
-                                       '--pipeline', store_path,
+                                       '--pipeline-store', store_path,
                                        'task-info', 'baz'])
 
     output_lines = result.output.split('\n')
@@ -162,17 +146,17 @@ def test_task_info(store_path):
 def test_rm_task(store_path):
 
     runner = CliRunner()
-    entry_point = 'tests/sample_pipelines/sample_pipeline_1.py'
+    entry_point = 'sample_pipelines/sample_pipeline_1.py'
 
     result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
-                                       '--pipeline', store_path,
+                                       '--pipeline-store', store_path,
                                        'run'])
 
     assert result.exit_code == 0
     assert Path(store_path / 'default').exists()
 
     result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
-                                       '--pipeline', store_path,
+                                       '--pipeline-store', store_path,
                                        'rm', 'foo'])
 
     assert result.exit_code == 0
@@ -186,7 +170,7 @@ def test_rm_task(store_path):
     assert 'foo' in str(ex.value)
 
     result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
-                                       '--pipeline', store_path,
+                                       '--pipeline-store', store_path,
                                        'rm', 'nonexistent-task'])
 
     assert result.exit_code == 0
@@ -196,15 +180,15 @@ def test_rm_task(store_path):
 def test_dump_task_graph():
 
     runner = CliRunner()
-    entry_point = 'tests/sample_pipelines/sample_pipeline_1.py'
-    pipeline_store = 'tests/sample_pipelines/sample_pipeline_1.json'
+    entry_point = 'sample_pipelines/sample_pipeline_1.py'
+    pipeline_store = 'sample_pipelines/sample_pipeline_1/'
     if Path(pipeline_store).exists():
-        Path(pipeline_store).unlink()
+        shutil.rmtree(Path(pipeline_store))
 
-    task_graph = 'tests/sample_pipelines/sample_task_graph.png'
+    task_graph = 'sample_pipelines/sample_task_graph.png'
 
     result = runner.invoke(cli.yenta, ['--entry-point', entry_point,
-                                       '--pipeline', pipeline_store,
+                                       '--pipeline-store', pipeline_store,
                                        'dump-task-graph', task_graph])
 
     assert result.exit_code == 0
