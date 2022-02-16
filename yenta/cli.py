@@ -138,15 +138,6 @@ def task_info(task_name, pipeline_name='default'):
                         key_node.add(Text(str(v)))
                 else:
                     values_node.add(Text(f'{key}: {val}'))
-            artifacts_node = tree.add('artifacts')
-            for key in sorted(task_result.artifacts.keys()):
-                val = task_result.artifacts.get(key)
-                if isinstance(val, Iterable) and not isinstance(val, str):
-                    key_node = artifacts_node.add(Text(f'{key}: '))
-                    for v in val:
-                        key_node.add(Text(v))
-                else:
-                    artifacts_node.add(Text(f'{key}: {val}'))
             print(tree)
         else:
             print('Previous result: ' + Fore.GREEN + 'None' + Fore.WHITE)
