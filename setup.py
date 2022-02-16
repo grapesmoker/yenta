@@ -11,7 +11,7 @@ with open('HISTORY.rst') as history_file:
     history = history_file.read()
 
 requirements = ['Click>=7.0', 'networkx~=2.5', 'colorama~=0.4.3', 'pydot~=1.4.1',
-                'rich~=9.11.0', 'more_itertools~=8.7.0']
+                'rich>=9.4.0', 'more_itertools~=8.7.0']
 
 setup_requirements = ['pytest-runner', ]
 
